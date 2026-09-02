@@ -12,6 +12,7 @@ import {
   renderizarMapaAsientos,
   obtenerAsientosSeleccionados,
 } from "./seatMap.js";
+import { validarNombre, validarContacto, validarCampo } from "./validation.js";
 
 // Estado del viaje que el usuario va armando mientras compra.
 // Se va llenando conforme avanza de pantalla en pantalla.
@@ -19,6 +20,8 @@ const viajeEnCurso = {
   fecha: null, // "AAAA-MM-DD"
   horario: null, // "HH:MM"
   catalogo: null,
+  asientos: [], // números de asiento confirmados al salir de la pantalla de asientos
+  pasajeros: [], // [{ numeroAsiento, nombre, contacto }, ...]
 };
 
 /**
@@ -40,6 +43,7 @@ async function iniciar() {
   dibujarHorarios(catalogo);
   configurarBotonesVolver();
   configurarBotonContinuarAsientos();
+  configurarFormularioPasajeros();
 }
 
 /**
@@ -156,19 +160,103 @@ function alCambiarSeleccionDeAsientos(seleccionados) {
 }
 
 /**
- * Conecta el botón "Continuar" de la pantalla de asientos.
- * Por ahora solo avanza de pantalla; el formulario de pasajeros
- * se termina de construir en el siguiente paso (validation.js).
+ * Conecta el botón "Continuar" de la pantalla de asientos: congela
+ * la selección actual en viajeEnCurso.asientos, dibuja un formulario
+ * de pasajero por cada asiento, y avanza de pantalla.
  */
 function configurarBotonContinuarAsientos() {
   const boton = document.getElementById("boton-continuar-asientos");
   boton.addEventListener("click", () => {
-    const asientos = obtenerAsientosSeleccionados();
-    console.log("Asientos elegidos:", asientos); // TODO: quitar cuando el formulario de pasajeros esté listo
-
-    // TODO: aquí vamos a llamar a una función de validation.js/index.js
-    // que dibuje un formulario por cada asiento en #campos-pasajeros.
+    viajeEnCurso.asientos = obtenerAsientosSeleccionados();
+    dibujarFormularioPasajeros(viajeEnCurso.asientos);
     mostrarPantalla("pasajeros");
+  });
+}
+
+/**
+ * Genera dinámicamente un bloque de campos (nombre + teléfono) por
+ * cada asiento elegido, dentro de #campos-pasajeros. Cada campo tiene
+ * un id único ("nombre-asiento-3") para poder validarlo por separado.
+ *
+ * @param {number[]} asientos - números de asiento elegidos
+ */
+function dibujarFormularioPasajeros(asientos) {
+  const contenedor = document.getElementById("campos-pasajeros");
+  contenedor.innerHTML = "";
+
+  for (const numeroAsiento of asientos) {
+    const bloque = document.createElement("fieldset");
+    bloque.className = "bloque-pasajero";
+    bloque.innerHTML = `
+      <legend>Asiento ${numeroAsiento}</legend>
+      <div class="campo">
+        <label for="nombre-asiento-${numeroAsiento}">Nombre</label>
+        <input type="text" id="nombre-asiento-${numeroAsiento}" placeholder="Nombre completo">
+        <p class="campo-error" id="error-nombre-${numeroAsiento}"></p>
+      </div>
+      <div class="campo">
+        <label for="contacto-asiento-${numeroAsiento}">Teléfono</label>
+        <input type="tel" id="contacto-asiento-${numeroAsiento}" placeholder="10 dígitos">
+        <p class="campo-error" id="error-contacto-${numeroAsiento}"></p>
+      </div>
+    `;
+    contenedor.appendChild(bloque);
+  }
+}
+
+/**
+ * Conecta el envío del formulario de pasajeros: valida el nombre y
+ * el teléfono de cada asiento con validation.js, y solo avanza a la
+ * pantalla de modalidad si TODOS los campos son válidos.
+ */
+function configurarFormularioPasajeros() {
+  const formulario = document.getElementById("formulario-pasajeros");
+
+  formulario.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+
+    const pasajeros = [];
+    let formularioValido = true;
+
+    for (const numeroAsiento of viajeEnCurso.asientos) {
+      const inputNombre = document.getElementById(
+        `nombre-asiento-${numeroAsiento}`,
+      );
+      const inputContacto = document.getElementById(
+        `contacto-asiento-${numeroAsiento}`,
+      );
+
+      const nombreValido = validarCampo(
+        inputNombre,
+        `error-nombre-${numeroAsiento}`,
+        validarNombre,
+      );
+      const contactoValido = validarCampo(
+        inputContacto,
+        `error-contacto-${numeroAsiento}`,
+        validarContacto,
+      );
+
+      if (!nombreValido || !contactoValido) {
+        formularioValido = false;
+      }
+
+      pasajeros.push({
+        numeroAsiento,
+        nombre: inputNombre.value.trim(),
+        contacto: inputContacto.value.trim(),
+      });
+    }
+
+    if (!formularioValido) {
+      return; // los mensajes de error ya quedaron visibles en cada campo
+    }
+
+    viajeEnCurso.pasajeros = pasajeros;
+
+    // TODO: siguiente paso — conectar la pantalla de modalidad
+    // (apartar vs. pagar en línea) usando booking.js.
+    mostrarPantalla("modalidad");
   });
 }
 

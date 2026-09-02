@@ -212,62 +212,41 @@ input:focus-visible {
 
 /* =============================================================
    MAPA DE ASIENTOS
-   Reproduce el acomodo real de la combi:
-   fila frente (2) → fila doble (2) → dos filas triples (2+pasillo+1) → banca trasera (4)
+   Una sola cuadrícula de 4 columnas para TODA la combi, así los
+   asientos quedan alineados verticalmente entre filas, igual que
+   en el vehículo real. Cada asiento se ubica con su propia
+   posición (fila/columna) desde seatMap.js.
    ============================================================= */
 .mapa-asientos {
   background: var(--color-superficie);
   border-radius: 16px;
   padding: var(--espacio-l) var(--espacio-m);
   margin-bottom: var(--espacio-l);
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-m);
-}
-
-.fila {
-  display: flex;
-  justify-content: center;
-  gap: 0.6rem;
-}
-
-/* Fila del frente: ícono de chofer + 2 asientos */
-.fila-frente {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(44px, auto);
+  row-gap: var(--espacio-m);
+  column-gap: 0.6rem;
+  justify-items: center;
   align-items: center;
-  padding-bottom: var(--espacio-s);
-  border-bottom: 1px dashed var(--color-borde);
+}
+
+.divisor-asientos {
+  width: 100%;
+  border-top: 1px dashed var(--color-borde);
 }
 
 .icono-chofer {
-  width: 40px;
+  width: 44px;
   height: 40px;
   border-radius: 8px;
   background: var(--color-borde);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--color-tinta);
-}
-
-/* Filas triples: 2 asientos, espacio de pasillo, 1 asiento */
-.fila-triple {
-  justify-content: flex-start;
-  padding-left: 0;
-}
-
-.fila-triple .grupo-izquierda {
-  display: flex;
-  gap: 0.6rem;
-}
-
-.fila-triple .pasillo {
-  width: 32px;
-}
-
-/* Banca trasera: 4 asientos pegados, sin pasillo */
-.fila-trasera {
-  gap: 0.35rem;
+  text-align: center;
 }
 
 /* El botón de cada asiento */
@@ -337,6 +316,20 @@ input:focus-visible {
 /* =============================================================
    FORMULARIOS (pasajeros y pago)
    ============================================================= */
+.bloque-pasajero {
+  border: none;
+  padding: 0 0 var(--espacio-m);
+  margin: 0 0 var(--espacio-m);
+  border-bottom: 1px dashed var(--color-borde);
+}
+
+.bloque-pasajero legend {
+  font-family: var(--fuente-titulos);
+  font-weight: 700;
+  padding: 0;
+  margin-bottom: var(--espacio-s);
+}
+
 .campo {
   margin-bottom: var(--espacio-m);
 }

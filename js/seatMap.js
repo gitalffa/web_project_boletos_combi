@@ -5,21 +5,38 @@
  * selección por clic. No sabe nada de localStorage ni de reservas:
  * solo recibe una lista de estados ya calculada (por booking.js) y
  * avisa, mediante un callback, cuándo cambia la selección.
+ *
+ * El mapa se dibuja como una sola cuadrícula CSS (4 columnas), para
+ * que los asientos queden alineados verticalmente entre filas, tal
+ * como están en la combi real (ver css/styles.css, .mapa-asientos).
  * -----------------------------------------------------------------
  */
 
 const MAXIMO_ASIENTOS_POR_COMPRA = 4;
 
-// Define el acomodo REAL de la combi, de adelante hacia atrás.
-// Cada fila dice qué números de asiento contiene y cómo se debe
-// dibujar (coincide con las clases ya definidas en css/styles.css).
-const FILAS_DE_LA_COMBI = [
-  { tipo: "frente", asientos: [1, 2] },
-  { tipo: "doble", asientos: [3, 4] },
-  { tipo: "triple", asientos: [5, 6, 7] },
-  { tipo: "triple", asientos: [8, 9, 10] },
-  { tipo: "trasera", asientos: [11, 12, 13, 14] },
-];
+// Posición de cada asiento dentro de la cuadrícula de 4 columnas.
+// "fila" deja un hueco (fila 2) para la línea divisoria bajo el
+// chofer, y "columna" ubica el asiento en la columna real que le
+// corresponde según el dibujo del transportista.
+const POSICIONES_ASIENTOS = {
+  1: { fila: 1, columna: 2 },
+  2: { fila: 1, columna: 3 },
+  3: { fila: 3, columna: 1 },
+  4: { fila: 3, columna: 2 },
+  5: { fila: 4, columna: 1 },
+  6: { fila: 4, columna: 2 },
+  7: { fila: 4, columna: 4 },
+  8: { fila: 5, columna: 1 },
+  9: { fila: 5, columna: 2 },
+  10: { fila: 5, columna: 4 },
+  11: { fila: 6, columna: 1 },
+  12: { fila: 6, columna: 2 },
+  13: { fila: 6, columna: 3 },
+  14: { fila: 6, columna: 4 },
+};
+
+const POSICION_CHOFER = { fila: 1, columna: 1 };
+const FILA_DIVISOR = 2; // línea punteada entre el frente y el resto
 
 // Estado interno del módulo: qué asientos lleva elegidos el usuario
 // en este momento (todavía sin confirmar/guardar como reserva).
@@ -30,7 +47,20 @@ let asientosSeleccionados = new Set();
 let funcionCuandoCambiaSeleccion = () => {};
 
 /**
- * Crea el botón de un asiento individual.
+ * Ubica un elemento dentro de la cuadrícula, usando las mismas
+ * coordenadas (fila/columna) en toda la app.
+ *
+ * @param {HTMLElement} elemento
+ * @param {{fila: number, columna: number}} posicion
+ */
+function ubicarEnGrid(elemento, posicion) {
+  elemento.style.gridRow = posicion.fila;
+  elemento.style.gridColumn = posicion.columna;
+}
+
+/**
+ * Crea el botón de un asiento individual, ya ubicado en su posición
+ * dentro de la cuadrícula.
  *
  * @param {{numero: number, estado: string}} datosAsiento
  * @returns {HTMLButtonElement}
@@ -42,6 +72,7 @@ function crearBotonAsiento(datosAsiento) {
   boton.textContent = datosAsiento.numero;
   boton.dataset.asientoId = datosAsiento.numero;
   boton.dataset.estado = datosAsiento.estado;
+  ubicarEnGrid(boton, POSICIONES_ASIENTOS[datosAsiento.numero]);
 
   const noSePuedeElegir = datosAsiento.estado !== "disponible";
   boton.disabled = noSePuedeElegir;
@@ -65,6 +96,36 @@ function crearBotonAsiento(datosAsiento) {
   );
 
   return boton;
+}
+
+/**
+ * Crea el ícono del chofer, ubicado en su posición fija dentro de
+ * la cuadrícula (siempre columna 1, fila 1).
+ *
+ * @returns {HTMLDivElement}
+ */
+function crearIconoChofer() {
+  const icono = document.createElement("div");
+  icono.className = "icono-chofer";
+  icono.textContent = "Chofer";
+  icono.setAttribute("aria-hidden", "true");
+  ubicarEnGrid(icono, POSICION_CHOFER);
+  return icono;
+}
+
+/**
+ * Crea la línea punteada que separa la fila del frente del resto
+ * de la combi, ocupando las 4 columnas de su fila.
+ *
+ * @returns {HTMLDivElement}
+ */
+function crearDivisor() {
+  const divisor = document.createElement("div");
+  divisor.className = "divisor-asientos";
+  divisor.setAttribute("aria-hidden", "true");
+  divisor.style.gridRow = FILA_DIVISOR;
+  divisor.style.gridColumn = "1 / -1"; // de la primera a la última columna
+  return divisor;
 }
 
 /**
@@ -111,7 +172,7 @@ function mostrarMensaje(texto) {
 
 /**
  * Dibuja el mapa completo de asientos dentro del contenedor indicado,
- * respetando las filas reales de la combi.
+ * ubicando cada elemento en su posición real de la cuadrícula.
  *
  * @param {Array<{numero: number, estado: string}>} estadosAsientos
  *   viene de booking.js -> calcularEstadoAsientos()
@@ -127,62 +188,12 @@ export function renderizarMapaAsientos(estadosAsientos, alCambiarSeleccion) {
   funcionCuandoCambiaSeleccion = alCambiarSeleccion;
   mostrarMensaje("");
 
-  for (const fila of FILAS_DE_LA_COMBI) {
-    contenedor.appendChild(construirFila(fila, estadosAsientos));
+  contenedor.appendChild(crearIconoChofer());
+  contenedor.appendChild(crearDivisor());
+
+  for (const datosAsiento of estadosAsientos) {
+    contenedor.appendChild(crearBotonAsiento(datosAsiento));
   }
-}
-
-/**
- * Construye el HTML de una fila completa (con su clase correspondiente
- * y, en el caso de las filas "triple", el hueco del pasillo).
- *
- * @param {{tipo: string, asientos: number[]}} fila
- * @param {Array<{numero: number, estado: string}>} estadosAsientos
- * @returns {HTMLDivElement}
- */
-function construirFila(fila, estadosAsientos) {
-  const contenedorFila = document.createElement("div");
-  contenedorFila.className = `fila fila-${fila.tipo}`;
-
-  const buscarEstado = (numero) =>
-    estadosAsientos.find((a) => a.numero === numero);
-
-  if (fila.tipo === "frente") {
-    const icono = document.createElement("div");
-    icono.className = "icono-chofer";
-    icono.textContent = "Chofer";
-    icono.setAttribute("aria-hidden", "true");
-    contenedorFila.appendChild(icono);
-
-    for (const numero of fila.asientos) {
-      contenedorFila.appendChild(crearBotonAsiento(buscarEstado(numero)));
-    }
-    return contenedorFila;
-  }
-
-  if (fila.tipo === "triple") {
-    const [izq1, izq2, der] = fila.asientos;
-
-    const grupoIzquierda = document.createElement("div");
-    grupoIzquierda.className = "grupo-izquierda";
-    grupoIzquierda.appendChild(crearBotonAsiento(buscarEstado(izq1)));
-    grupoIzquierda.appendChild(crearBotonAsiento(buscarEstado(izq2)));
-
-    const pasillo = document.createElement("div");
-    pasillo.className = "pasillo";
-    pasillo.setAttribute("aria-hidden", "true");
-
-    contenedorFila.appendChild(grupoIzquierda);
-    contenedorFila.appendChild(pasillo);
-    contenedorFila.appendChild(crearBotonAsiento(buscarEstado(der)));
-    return contenedorFila;
-  }
-
-  // Filas "doble" y "trasera": simplemente todos los asientos seguidos.
-  for (const numero of fila.asientos) {
-    contenedorFila.appendChild(crearBotonAsiento(buscarEstado(numero)));
-  }
-  return contenedorFila;
 }
 
 /**
