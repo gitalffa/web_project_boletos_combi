@@ -1,0 +1,43 @@
+{
+  "ruta": {
+    "origen": "Tepic",
+    "destino": "Batanga",
+    "paradasIntermedias": [
+      "Pichón",
+      "Trapichillo",
+      "Resolana",
+      "Jumatan",
+      "Limón",
+      "Jicote",
+      "Tírate",
+      "Papalote",
+      "Santiago",
+      "Amapa",
+      "Cerritos",
+      "P. Nuevo",
+      "Gav. Grande",
+      "Gav. Chico",
+      "Sentispax",
+      "San Miguel"
+    ],
+    "precioRutaCompleta": 160
+  },
+  "capacidadVehiculo": 14,
+  "horariosPorDia": {
+    "lunesASabado": [
+      "06:00",
+      "08:00",
+      "10:30",
+      "12:00",
+      "15:00",
+      "17:00"
+    ],
+    "domingo": [
+      "06:00",
+      "08:00",
+      "12:00",
+      "15:00",
+      "17:00"
+    ]
+  }
+}

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tepic → Batanga | Boletos de combi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Karla:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="encabezado">
+      <p class="encabezado__transportista">Servicio de combi</p>
+      <h1 class="encabezado__ruta">
+        Tepic <span class="encabezado__flecha">→</span> Batanga
+      </h1>
+    </header>
+
+    <main class="contenedor">
+      <!-- PANTALLA 1: Inicio — elegir horario -->
+      <section
+        id="pantalla-inicio"
+        class="pantalla activa"
+        data-pantalla="inicio"
+      >
+        <h2>Elige tu horario</h2>
+        <p class="texto-ayuda">Ruta completa, con paradas en el camino.</p>
+
+        <ul id="lista-paradas" class="lista-paradas">
+          <!-- JS inserta aquí las paradas intermedias -->
+        </ul>
+
+        <div id="lista-horarios" class="lista-horarios">
+          <!-- JS inserta aquí los botones de horario disponibles -->
+        </div>
+      </section>
+
+      <!-- PANTALLA 2: Selección de asientos -->
+      <section id="pantalla-asientos" class="pantalla" data-pantalla="asientos">
+        <button type="button" class="boton-volver" data-volver="inicio">
+          ← Cambiar horario
+        </button>
+
+        <div id="resumen-viaje" class="resumen-viaje">
+          <!-- JS inserta aquí: horario elegido, precio -->
+        </div>
+
+        <h2>Elige tu asiento</h2>
+
+        <ul class="leyenda">
+          <li>
+            <span class="pastilla pastilla--disponible"></span> Disponible
+          </li>
+          <li>
+            <span class="pastilla pastilla--seleccionado"></span> Elegido por ti
+          </li>
+          <li><span class="pastilla pastilla--apartado"></span> Apartado</li>
+          <li><span class="pastilla pastilla--confirmado"></span> Ocupado</li>
+        </ul>
+
+        <div
+          id="mapa-asientos"
+          class="mapa-asientos"
+          aria-label="Mapa de asientos de la combi"
+        >
+          <!-- JS inserta aquí los 14 asientos -->
+        </div>
+
+        <p id="mensaje-asientos" class="texto-ayuda" aria-live="polite"></p>
+
+        <button
+          type="button"
+          id="boton-continuar-asientos"
+          class="boton-primario"
+          disabled
+        >
+          Continuar
+        </button>
+      </section>
+
+      <!-- PANTALLA 3: Datos del pasajero (uno por asiento elegido) -->
+      <section
+        id="pantalla-pasajeros"
+        class="pantalla"
+        data-pantalla="pasajeros"
+      >
+        <button type="button" class="boton-volver" data-volver="asientos">
+          ← Cambiar asiento
+        </button>
+
+        <h2>Datos del pasajero</h2>
+        <p class="texto-ayuda">Un formulario por cada asiento elegido.</p>
+
+        <form id="formulario-pasajeros" novalidate>
+          <div id="campos-pasajeros">
+            <!-- JS inserta aquí un bloque de campos por cada asiento -->
+          </div>
+
+          <button type="submit" class="boton-primario">Continuar</button>
+        </form>
+      </section>
+
+      <!-- PANTALLA 4: Elegir modalidad (apartar o pagar) -->
+      <section
+        id="pantalla-modalidad"
+        class="pantalla"
+        data-pantalla="modalidad"
+      >
+        <button type="button" class="boton-volver" data-volver="pasajeros">
+          ← Volver
+        </button>
+
+        <h2>¿Cómo quieres reservar?</h2>
+
+        <div class="opciones-modalidad">
+          <button type="button" id="boton-apartar" class="tarjeta-opcion">
+            <span class="tarjeta-opcion__titulo">Apartar mi lugar</span>
+            <span class="tarjeta-opcion__detalle"
+              >Pagas en efectivo al abordar. Tu lugar se libera si no llegas a
+              tiempo.</span
+            >
+          </button>
+
+          <button type="button" id="boton-pagar" class="tarjeta-opcion">
+            <span class="tarjeta-opcion__titulo">Pagar en línea</span>
+            <span class="tarjeta-opcion__detalle"
+              >Tu lugar queda confirmado de inmediato.</span
+            >
+          </button>
+        </div>
+
+        <form id="formulario-pago" class="formulario-pago" hidden novalidate>
+          <!-- JS muestra este formulario solo si elige "Pagar en línea" -->
+          <div id="campos-pago">
+            <!-- campos de tarjeta simulada -->
+          </div>
+          <button type="submit" class="boton-primario">Confirmar pago</button>
+        </form>
+      </section>
+
+      <!-- PANTALLA 5: Confirmación / comprobante -->
+      <section
+        id="pantalla-confirmacion"
+        class="pantalla"
+        data-pantalla="confirmacion"
+      >
+        <div id="comprobante" class="comprobante">
+          <!-- JS inserta aquí el folio, horario, asientos, pasajeros -->
+        </div>
+
+        <button type="button" id="boton-nueva-compra" class="boton-secundario">
+          Reservar otro boleto
+        </button>
+      </section>
+    </main>
+
+    <script type="module" src="js/index.js"></script>
+  </body>
+</html>

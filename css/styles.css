@@ -1,0 +1,416 @@
+/* =============================================================
+   VARIABLES — paleta y tipografía del proyecto
+   ============================================================= */
+:root {
+  /* Paleta: verde sierra + dorado letrero de ruta */
+  --color-fondo: #eef0e4;
+  --color-superficie: #ffffff;
+  --color-primario: #1f4b3d;
+  --color-primario-oscuro: #14332a;
+  --color-acento: #c88a2c;
+  --color-tinta: #2b2620;
+  --color-borde: #d8d6c6;
+
+  /* Estados del asiento */
+  --color-disponible: #cfe0c7;
+  --color-seleccionado: #1f4b3d;
+  --color-apartado: #e8b84b;
+  --color-confirmado: #a6432e;
+
+  /* Tipografía */
+  --fuente-titulos: "Fraunces", serif;
+  --fuente-texto: "Karla", sans-serif;
+
+  /* Espaciado */
+  --espacio-s: 0.5rem;
+  --espacio-m: 1rem;
+  --espacio-l: 1.75rem;
+}
+
+/* =============================================================
+   RESET BÁSICO
+   ============================================================= */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  font-family: var(--fuente-texto);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--fuente-titulos);
+  margin: 0 0 var(--espacio-s);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Accesibilidad: foco visible siempre, sin importar el navegador */
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--color-acento);
+  outline-offset: 2px;
+}
+
+/* =============================================================
+   ENCABEZADO
+   ============================================================= */
+.encabezado {
+  background: var(--color-primario);
+  color: white;
+  padding: var(--espacio-l) var(--espacio-m);
+  text-align: center;
+}
+
+.encabezado__transportista {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: var(--color-acento);
+}
+
+.encabezado__ruta {
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 700;
+}
+
+.encabezado__flecha {
+  color: var(--color-acento);
+}
+
+/* =============================================================
+   CONTENEDOR PRINCIPAL Y PANTALLAS
+   ============================================================= */
+.contenedor {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--espacio-m);
+}
+
+/* Cada "paso" del flujo de compra vive aquí, oculto por defecto */
+.pantalla {
+  display: none;
+}
+
+.pantalla.activa {
+  display: block;
+}
+
+.texto-ayuda {
+  color: #5a5648;
+  margin-top: 0;
+}
+
+.boton-volver {
+  background: none;
+  border: none;
+  color: var(--color-primario);
+  font-weight: 700;
+  padding: 0;
+  margin-bottom: var(--espacio-m);
+}
+
+/* =============================================================
+   PARADAS Y HORARIOS (pantalla de inicio)
+   ============================================================= */
+.lista-paradas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: var(--espacio-l);
+}
+
+.lista-paradas li {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.lista-horarios {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--espacio-s);
+}
+
+.boton-horario {
+  background: var(--color-superficie);
+  border: 2px solid var(--color-borde);
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primario);
+}
+
+.boton-horario:hover {
+  border-color: var(--color-primario);
+}
+
+/* =============================================================
+   RESUMEN DEL VIAJE (pantalla de asientos)
+   ============================================================= */
+.resumen-viaje {
+  background: var(--color-superficie);
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  margin-bottom: var(--espacio-m);
+}
+
+/* =============================================================
+   LEYENDA DE ESTADOS
+   ============================================================= */
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-m);
+  font-size: 0.8rem;
+  margin-bottom: var(--espacio-m);
+}
+
+.leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pastilla {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.pastilla--disponible {
+  background: var(--color-disponible);
+}
+.pastilla--seleccionado {
+  background: var(--color-seleccionado);
+}
+.pastilla--apartado {
+  background: var(--color-apartado);
+}
+.pastilla--confirmado {
+  background: var(--color-confirmado);
+}
+
+/* =============================================================
+   MAPA DE ASIENTOS
+   Reproduce el acomodo real de la combi:
+   fila frente (2) → fila doble (2) → dos filas triples (2+pasillo+1) → banca trasera (4)
+   ============================================================= */
+.mapa-asientos {
+  background: var(--color-superficie);
+  border-radius: 16px;
+  padding: var(--espacio-l) var(--espacio-m);
+  margin-bottom: var(--espacio-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-m);
+}
+
+.fila {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* Fila del frente: ícono de chofer + 2 asientos */
+.fila-frente {
+  align-items: center;
+  padding-bottom: var(--espacio-s);
+  border-bottom: 1px dashed var(--color-borde);
+}
+
+.icono-chofer {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--color-borde);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--color-tinta);
+}
+
+/* Filas triples: 2 asientos, espacio de pasillo, 1 asiento */
+.fila-triple {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+.fila-triple .grupo-izquierda {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.fila-triple .pasillo {
+  width: 32px;
+}
+
+/* Banca trasera: 4 asientos pegados, sin pasillo */
+.fila-trasera {
+  gap: 0.35rem;
+}
+
+/* El botón de cada asiento */
+.asiento {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 2px solid var(--color-borde);
+  background: var(--color-disponible);
+  font-weight: 700;
+  color: var(--color-tinta);
+}
+
+.asiento[data-estado="apartado"] {
+  background: var(--color-apartado);
+  color: white;
+}
+
+.asiento[data-estado="confirmado"] {
+  background: var(--color-confirmado);
+  color: white;
+  cursor: not-allowed;
+}
+
+.asiento[data-seleccionado="true"] {
+  background: var(--color-seleccionado);
+  border-color: var(--color-primario-oscuro);
+  color: white;
+}
+
+.asiento:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+/* =============================================================
+   BOTONES PRINCIPALES
+   ============================================================= */
+.boton-primario {
+  width: 100%;
+  background: var(--color-primario);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.boton-primario:disabled {
+  background: var(--color-borde);
+  color: #8a8776;
+  cursor: not-allowed;
+}
+
+.boton-secundario {
+  width: 100%;
+  background: none;
+  border: 2px solid var(--color-primario);
+  color: var(--color-primario);
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* =============================================================
+   FORMULARIOS (pasajeros y pago)
+   ============================================================= */
+.campo {
+  margin-bottom: var(--espacio-m);
+}
+
+.campo label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.campo input {
+  width: 100%;
+  padding: 0.65rem;
+  border: 2px solid var(--color-borde);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.campo input:invalid:not(:placeholder-shown) {
+  border-color: var(--color-confirmado);
+}
+
+.campo-error {
+  color: var(--color-confirmado);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: none;
+}
+
+/* =============================================================
+   MODALIDAD (apartar vs pagar)
+   ============================================================= */
+.opciones-modalidad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-m);
+  margin-bottom: var(--espacio-m);
+}
+
+.tarjeta-opcion {
+  text-align: left;
+  background: var(--color-superficie);
+  border: 2px solid var(--color-borde);
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tarjeta-opcion:hover {
+  border-color: var(--color-primario);
+}
+
+.tarjeta-opcion__titulo {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-primario);
+}
+
+.tarjeta-opcion__detalle {
+  font-size: 0.85rem;
+  color: #5a5648;
+}
+
+/* =============================================================
+   COMPROBANTE
+   ============================================================= */
+.comprobante {
+  background: var(--color-superficie);
+  border-radius: 16px;
+  padding: var(--espacio-l);
+  margin-bottom: var(--espacio-m);
+  border: 2px dashed var(--color-acento);
+}
