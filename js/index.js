@@ -7,12 +7,24 @@
  */
 
 import { obtenerCatalogo, obtenerHorariosDelDia } from "./dataService.js";
-import { limpiarReservasVencidas, calcularEstadoAsientos } from "./booking.js";
+import {
+  limpiarReservasVencidas,
+  calcularEstadoAsientos,
+  crearReserva,
+  filtrarHorariosFuturos,
+} from "./booking.js";
 import {
   renderizarMapaAsientos,
   obtenerAsientosSeleccionados,
 } from "./seatMap.js";
-import { validarNombre, validarContacto, validarCampo } from "./validation.js";
+import {
+  validarNombre,
+  validarContacto,
+  validarNumeroTarjeta,
+  validarVencimiento,
+  validarCVV,
+  validarCampo,
+} from "./validation.js";
 
 // Estado del viaje que el usuario va armando mientras compra.
 // Se va llenando conforme avanza de pantalla en pantalla.
@@ -44,6 +56,7 @@ async function iniciar() {
   configurarBotonesVolver();
   configurarBotonContinuarAsientos();
   configurarFormularioPasajeros();
+  configurarModalidad();
 }
 
 /**
@@ -78,15 +91,22 @@ function dibujarParadas(catalogo) {
 }
 
 /**
- * Dibuja los botones de horario disponibles para hoy, según si es
- * domingo o no (regla que ya vive en dataService.obtenerHorariosDelDia).
+ * Dibuja los botones de horario disponibles para hoy: primero según
+ * si es domingo o no, y luego quitando los que ya salieron.
  */
 function dibujarHorarios(catalogo) {
   const contenedor = document.getElementById("lista-horarios");
   contenedor.innerHTML = "";
 
   const hoy = new Date();
-  const horarios = obtenerHorariosDelDia(catalogo, hoy);
+  const fechaISO = formatearFechaISO(hoy);
+  const horariosDelDia = obtenerHorariosDelDia(catalogo, hoy);
+  const horarios = filtrarHorariosFuturos(fechaISO, horariosDelDia);
+
+  if (horarios.length === 0) {
+    contenedor.innerHTML = `<p class="texto-ayuda">Ya no hay salidas disponibles por hoy. Vuelve mañana.</p>`;
+    return;
+  }
 
   for (const horario of horarios) {
     const boton = document.createElement("button");
@@ -253,11 +273,260 @@ function configurarFormularioPasajeros() {
     }
 
     viajeEnCurso.pasajeros = pasajeros;
-
-    // TODO: siguiente paso — conectar la pantalla de modalidad
-    // (apartar vs. pagar en línea) usando booking.js.
+    reiniciarPantallaModalidad();
     mostrarPantalla("modalidad");
   });
+}
+
+/**
+ * Conecta los botones y el formulario de la pantalla de modalidad:
+ * "Apartar mi lugar", "Pagar en línea", el formulario de tarjeta
+ * simulada, su botón de cancelar, y el botón para reservar otro boleto.
+ */
+function configurarModalidad() {
+  document
+    .getElementById("boton-apartar")
+    .addEventListener("click", manejarApartar);
+  document
+    .getElementById("boton-pagar")
+    .addEventListener("click", mostrarFormularioPago);
+  document
+    .getElementById("formulario-pago")
+    .addEventListener("submit", manejarPago);
+  document
+    .getElementById("boton-cancelar-pago")
+    .addEventListener("click", () => {
+      reiniciarPantallaModalidad();
+    });
+  document
+    .getElementById("boton-nueva-compra")
+    .addEventListener("click", reiniciarCompra);
+}
+
+/**
+ * Deja la pantalla de modalidad en su estado inicial: opciones
+ * visibles, formulario de pago oculto y limpio, sin mensajes de error.
+ */
+function reiniciarPantallaModalidad() {
+  document.getElementById("opciones-modalidad").hidden = false;
+  document.getElementById("formulario-pago").hidden = true;
+  document.getElementById("formulario-pago").reset();
+  mostrarMensajeModalidad("");
+}
+
+/**
+ * Se ejecuta al elegir "Apartar mi lugar": no pide datos extra,
+ * solo revalida los asientos y guarda la reserva como "apartado".
+ */
+function manejarApartar() {
+  if (!verificarAsientosSiguenDisponibles()) return;
+
+  const reserva = crearReserva({
+    fecha: viajeEnCurso.fecha,
+    horario: viajeEnCurso.horario,
+    asientos: viajeEnCurso.asientos,
+    pasajeros: viajeEnCurso.pasajeros,
+    modalidad: "apartado",
+  });
+
+  if (!reserva) {
+    mostrarMensajeModalidad(
+      "No se pudo guardar tu apartado. Intenta de nuevo.",
+    );
+    return;
+  }
+
+  dibujarComprobante(reserva);
+  mostrarPantalla("confirmacion");
+}
+
+/**
+ * Se ejecuta al elegir "Pagar en línea": oculta las dos opciones y
+ * dibuja el formulario de tarjeta simulada.
+ */
+function mostrarFormularioPago() {
+  dibujarCamposPago();
+  document.getElementById("opciones-modalidad").hidden = true;
+  document.getElementById("formulario-pago").hidden = false;
+  mostrarMensajeModalidad("");
+}
+
+/**
+ * Genera los campos del formulario de tarjeta simulada dentro de
+ * #campos-pago: número, vencimiento y CVV, cada uno con su mensaje
+ * de error correspondiente.
+ */
+function dibujarCamposPago() {
+  const contenedor = document.getElementById("campos-pago");
+  contenedor.innerHTML = `
+    <div class="campo">
+      <label for="numero-tarjeta">Número de tarjeta</label>
+      <input type="text" id="numero-tarjeta" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="19">
+      <p class="campo-error" id="error-numero-tarjeta"></p>
+    </div>
+    <div class="campo">
+      <label for="vencimiento-tarjeta">Vencimiento (MM/AA)</label>
+      <input type="text" id="vencimiento-tarjeta" placeholder="09/28" maxlength="5">
+      <p class="campo-error" id="error-vencimiento-tarjeta"></p>
+    </div>
+    <div class="campo">
+      <label for="cvv-tarjeta">CVV</label>
+      <input type="text" id="cvv-tarjeta" inputmode="numeric" placeholder="123" maxlength="3">
+      <p class="campo-error" id="error-cvv-tarjeta"></p>
+    </div>
+  `;
+}
+
+/**
+ * Se ejecuta al enviar el formulario de pago: valida los tres campos
+ * de la tarjeta simulada, revalida los asientos, y si todo está bien
+ * guarda la reserva como "confirmado" (pagado).
+ */
+function manejarPago(evento) {
+  evento.preventDefault();
+
+  const inputNumero = document.getElementById("numero-tarjeta");
+  const inputVencimiento = document.getElementById("vencimiento-tarjeta");
+  const inputCVV = document.getElementById("cvv-tarjeta");
+
+  const numeroValido = validarCampo(
+    inputNumero,
+    "error-numero-tarjeta",
+    validarNumeroTarjeta,
+  );
+  const vencimientoValido = validarCampo(
+    inputVencimiento,
+    "error-vencimiento-tarjeta",
+    validarVencimiento,
+  );
+  const cvvValido = validarCampo(inputCVV, "error-cvv-tarjeta", validarCVV);
+
+  if (!numeroValido || !vencimientoValido || !cvvValido) {
+    return; // los mensajes de error ya quedaron visibles en cada campo
+  }
+
+  if (!verificarAsientosSiguenDisponibles()) return;
+
+  const reserva = crearReserva({
+    fecha: viajeEnCurso.fecha,
+    horario: viajeEnCurso.horario,
+    asientos: viajeEnCurso.asientos,
+    pasajeros: viajeEnCurso.pasajeros,
+    modalidad: "confirmado",
+  });
+
+  if (!reserva) {
+    mostrarMensajeModalidad("No se pudo guardar tu pago. Intenta de nuevo.");
+    return;
+  }
+
+  dibujarComprobante(reserva);
+  mostrarPantalla("confirmacion");
+}
+
+/**
+ * Vuelve a calcular el estado de los asientos y confirma que los
+ * que el usuario eligió sigan disponibles. Si alguno ya no lo está,
+ * avisa y lo regresa a la pantalla de asientos con el mapa actualizado.
+ *
+ * @returns {boolean} true si todos los asientos elegidos siguen libres
+ */
+function verificarAsientosSiguenDisponibles() {
+  const estadosActuales = calcularEstadoAsientos(
+    viajeEnCurso.catalogo,
+    viajeEnCurso.fecha,
+    viajeEnCurso.horario,
+  );
+
+  const algunoYaNoDisponible = viajeEnCurso.asientos.some((numero) => {
+    const estado = estadosActuales.find((a) => a.numero === numero);
+    return !estado || estado.estado !== "disponible";
+  });
+
+  if (algunoYaNoDisponible) {
+    mostrarMensajeModalidad(
+      "Uno de tus asientos ya no está disponible. Elige de nuevo, por favor.",
+    );
+    renderizarMapaAsientos(estadosActuales, alCambiarSeleccionDeAsientos);
+    mostrarPantalla("asientos");
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Muestra un mensaje corto en la pantalla de modalidad (errores o
+ * avisos), o lo limpia si se le pasa una cadena vacía.
+ */
+function mostrarMensajeModalidad(texto) {
+  const contenedor = document.getElementById("mensaje-modalidad");
+  if (contenedor) {
+    contenedor.textContent = texto;
+  }
+}
+
+/**
+ * Dibuja el comprobante final con el folio, el horario, los
+ * pasajeros y, si aplica, la fecha límite para pagar/abordar.
+ *
+ * @param {Object} reserva - la reserva que regresó crearReserva()
+ */
+function dibujarComprobante(reserva) {
+  const contenedor = document.getElementById("comprobante");
+
+  const listaPasajeros = reserva.pasajeros
+    .map(
+      (p) => `<li>Asiento ${p.numeroAsiento}: ${p.nombre} — ${p.contacto}</li>`,
+    )
+    .join("");
+
+  const textoModalidad =
+    reserva.modalidad === "apartado"
+      ? "Apartado (pagas al abordar)"
+      : "Pagado en línea";
+
+  const avisoVencimiento =
+    reserva.modalidad === "apartado"
+      ? `<p><strong>Debes abordar o pagar antes de:</strong> ${formatearFechaHoraLegible(reserva.vencePara)}</p>`
+      : "";
+
+  contenedor.innerHTML = `
+    <h2>¡Listo! Este es tu comprobante</h2>
+    <p><strong>Folio:</strong> ${reserva.folio}</p>
+    <p><strong>Salida:</strong> ${reserva.horario} hrs, ${reserva.fecha}</p>
+    <p><strong>Modalidad:</strong> ${textoModalidad}</p>
+    <ul>${listaPasajeros}</ul>
+    ${avisoVencimiento}
+  `;
+}
+
+/**
+ * Convierte una fecha ISO ("2026-09-15T07:30:00.000Z") a un texto
+ * legible en español, para mostrarla en el comprobante.
+ */
+function formatearFechaHoraLegible(fechaISO) {
+  const fecha = new Date(fechaISO);
+  return fecha.toLocaleString("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+/**
+ * Reinicia todo el estado del viaje en curso y regresa a la pantalla
+ * de inicio, para que el usuario pueda reservar otro boleto.
+ */
+function reiniciarCompra() {
+  viajeEnCurso.fecha = null;
+  viajeEnCurso.horario = null;
+  viajeEnCurso.asientos = [];
+  viajeEnCurso.pasajeros = [];
+
+  document.getElementById("formulario-pasajeros").reset();
+  reiniciarPantallaModalidad();
+
+  mostrarPantalla("inicio");
 }
 
 /**

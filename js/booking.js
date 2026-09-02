@@ -31,6 +31,22 @@ function obtenerFechaHoraSalida(fecha, horario) {
 }
 
 /**
+ * Quita de una lista de horarios los que ya salieron (su hora de
+ * salida ya pasó respecto a este momento). La usamos para no dejar
+ * que alguien reserve un viaje que ya se fue.
+ *
+ * @param {string} fecha - "AAAA-MM-DD"
+ * @param {string[]} horarios - ej. ["06:00", "08:00", "10:30", ...]
+ * @returns {string[]} solo los horarios cuya salida sigue en el futuro
+ */
+export function filtrarHorariosFuturos(fecha, horarios) {
+  const ahora = new Date();
+  return horarios.filter(
+    (horario) => obtenerFechaHoraSalida(fecha, horario) > ahora,
+  );
+}
+
+/**
  * Calcula la fecha/hora límite para pagar un asiento apartado:
  * 30 minutos antes de la salida del viaje.
  *

@@ -115,8 +115,9 @@
         </button>
 
         <h2>¿Cómo quieres reservar?</h2>
+        <p id="mensaje-modalidad" class="texto-ayuda" aria-live="polite"></p>
 
-        <div class="opciones-modalidad">
+        <div id="opciones-modalidad" class="opciones-modalidad">
           <button type="button" id="boton-apartar" class="tarjeta-opcion">
             <span class="tarjeta-opcion__titulo">Apartar mi lugar</span>
             <span class="tarjeta-opcion__detalle"
@@ -135,6 +136,9 @@
 
         <form id="formulario-pago" class="formulario-pago" hidden novalidate>
           <!-- JS muestra este formulario solo si elige "Pagar en línea" -->
+          <button type="button" id="boton-cancelar-pago" class="boton-volver">
+            ← Elegir otra opción
+          </button>
           <div id="campos-pago">
             <!-- campos de tarjeta simulada -->
           </div>
