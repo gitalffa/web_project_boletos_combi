@@ -1,22 +1,24 @@
 /**
  * index.js
  * -----------------------------------------------------------------
- * Punto de entrada de la app. Conecta dataService, booking y seatMap,
- * y controla qué pantalla se muestra en cada momento.
+ * Punto de entrada de la app. Ahora habla con la API real (Express +
+ * MySQL) a través de dataService.js, en vez de JSON/localStorage.
+ * booking.js del frontend ya no se usa: toda esa lógica (estado de
+ * asientos, folios, vencimientos) ahora vive en el backend.
  * -----------------------------------------------------------------
  */
 
-import { obtenerCatalogo, obtenerHorariosDelDia } from "./dataService.js";
 import {
-  limpiarReservasVencidas,
-  calcularEstadoAsientos,
+  obtenerConfiguracion,
+  obtenerParadas,
+  obtenerHorarios,
+  obtenerEstadoAsientos,
   crearReserva,
-  filtrarHorariosFuturos,
-} from "./booking.js";
+} from "./dataService.js?v=1";
 import {
   renderizarMapaAsientos,
   obtenerAsientosSeleccionados,
-} from "./seatMap.js";
+} from "./seatMap.js?v=1";
 import {
   validarNombre,
   validarContacto,
@@ -24,35 +26,33 @@ import {
   validarVencimiento,
   validarCVV,
   validarCampo,
-} from "./validation.js";
+} from "./validation.js?v=1";
+
+// Configuración fija de la app (precio, capacidad, minutos de
+// expiración), cargada una sola vez al arrancar.
+let configuracionApp = null;
 
 // Estado del viaje que el usuario va armando mientras compra.
-// Se va llenando conforme avanza de pantalla en pantalla.
 const viajeEnCurso = {
   fecha: null, // "AAAA-MM-DD"
-  horario: null, // "HH:MM"
-  catalogo: null,
-  asientos: [], // números de asiento confirmados al salir de la pantalla de asientos
-  pasajeros: [], // [{ numeroAsiento, nombre, contacto }, ...]
+  horarioId: null, // id numérico, el que espera el backend
+  horaTexto: null, // "06:00", solo para mostrar en pantalla
+  asientos: [],
+  pasajeros: [],
 };
 
-/**
- * Arranca la app: carga el catálogo, limpia reservas vencidas,
- * dibuja la pantalla de inicio y deja listos los botones de "volver".
- */
 async function iniciar() {
-  const catalogo = await obtenerCatalogo();
+  try {
+    configuracionApp = await obtenerConfiguracion();
+    const paradas = await obtenerParadas();
 
-  if (!catalogo) {
-    mostrarErrorDeCarga();
+    dibujarParadas(paradas);
+    await dibujarHorarios();
+  } catch (error) {
+    mostrarErrorDeCarga(error);
     return;
   }
 
-  viajeEnCurso.catalogo = catalogo;
-
-  limpiarReservasVencidas();
-  dibujarParadas(catalogo);
-  dibujarHorarios(catalogo);
   configurarBotonesVolver();
   configurarBotonContinuarAsientos();
   configurarFormularioPasajeros();
@@ -60,11 +60,11 @@ async function iniciar() {
 }
 
 /**
- * Si el catálogo no cargó (por ejemplo, sin conexión o sin servidor
- * local), mostramos un mensaje claro en vez de dejar la pantalla vacía
- * sin explicación.
+ * Si la API no respondió (backend apagado, sin conexión), mostramos
+ * un mensaje claro en vez de dejar la pantalla vacía sin explicación.
  */
-function mostrarErrorDeCarga() {
+function mostrarErrorDeCarga(error) {
+  console.error("Error al cargar la app:", error);
   const contenedor = document.getElementById("pantalla-inicio");
   contenedor.innerHTML = `
     <h2>No se pudo cargar la información</h2>
@@ -75,15 +75,11 @@ function mostrarErrorDeCarga() {
   `;
 }
 
-/**
- * Dibuja la lista de paradas intermedias en la pantalla de inicio
- * (solo informativa por ahora).
- */
-function dibujarParadas(catalogo) {
+function dibujarParadas(paradas) {
   const lista = document.getElementById("lista-paradas");
   lista.innerHTML = "";
 
-  for (const parada of catalogo.ruta.paradasIntermedias) {
+  for (const parada of paradas) {
     const item = document.createElement("li");
     item.textContent = parada;
     lista.appendChild(item);
@@ -91,17 +87,16 @@ function dibujarParadas(catalogo) {
 }
 
 /**
- * Dibuja los botones de horario disponibles para hoy: primero según
- * si es domingo o no, y luego quitando los que ya salieron.
+ * Dibuja los horarios de hoy. Ya NO filtramos nada aquí (ni domingo
+ * ni "ya pasó") — el backend regresa directamente la lista correcta.
  */
-function dibujarHorarios(catalogo) {
+async function dibujarHorarios() {
   const contenedor = document.getElementById("lista-horarios");
   contenedor.innerHTML = "";
 
   const hoy = new Date();
   const fechaISO = formatearFechaISO(hoy);
-  const horariosDelDia = obtenerHorariosDelDia(catalogo, hoy);
-  const horarios = filtrarHorariosFuturos(fechaISO, horariosDelDia);
+  const horarios = await obtenerHorarios(fechaISO);
 
   if (horarios.length === 0) {
     contenedor.innerHTML = `<p class="texto-ayuda">Ya no hay salidas disponibles por hoy. Vuelve mañana.</p>`;
@@ -109,40 +104,18 @@ function dibujarHorarios(catalogo) {
   }
 
   for (const horario of horarios) {
+    const horaTexto = horario.hora.slice(0, 5); // "06:00:00" -> "06:00"
     const boton = document.createElement("button");
     boton.type = "button";
     boton.className = "boton-horario";
-    boton.textContent = horario;
-    boton.addEventListener("click", () => elegirHorario(horario, hoy));
+    boton.textContent = horaTexto;
+    boton.addEventListener("click", () =>
+      elegirHorario(horario.id, horaTexto, fechaISO),
+    );
     contenedor.appendChild(boton);
   }
 }
 
-/**
- * Se ejecuta cuando el usuario elige un horario: guarda la elección,
- * calcula el estado de los asientos para ese viaje específico, dibuja
- * el mapa y avanza a la pantalla de asientos.
- */
-function elegirHorario(horario, fecha) {
-  viajeEnCurso.horario = horario;
-  viajeEnCurso.fecha = formatearFechaISO(fecha);
-
-  dibujarResumenViaje();
-
-  const estados = calcularEstadoAsientos(
-    viajeEnCurso.catalogo,
-    viajeEnCurso.fecha,
-    viajeEnCurso.horario,
-  );
-  renderizarMapaAsientos(estados, alCambiarSeleccionDeAsientos);
-
-  mostrarPantalla("asientos");
-}
-
-/**
- * Convierte un objeto Date a texto "AAAA-MM-DD", que es el formato
- * que usamos para guardar y comparar fechas en las reservas.
- */
 function formatearFechaISO(fecha) {
   const año = fecha.getFullYear();
   const mes = String(fecha.getMonth() + 1).padStart(2, "0");
@@ -151,27 +124,37 @@ function formatearFechaISO(fecha) {
 }
 
 /**
- * Muestra el horario elegido y el precio en la parte de arriba de
- * la pantalla de asientos, para que el usuario tenga contexto.
+ * Se ejecuta al elegir un horario: guarda la elección y pide al
+ * backend el estado real de los asientos para ese viaje.
  */
+async function elegirHorario(horarioId, horaTexto, fecha) {
+  viajeEnCurso.horarioId = horarioId;
+  viajeEnCurso.horaTexto = horaTexto;
+  viajeEnCurso.fecha = fecha;
+
+  dibujarResumenViaje();
+  mostrarPantalla("asientos");
+
+  try {
+    const estados = await obtenerEstadoAsientos(fecha, horarioId);
+    renderizarMapaAsientos(estados, alCambiarSeleccionDeAsientos);
+  } catch (error) {
+    console.error("Error al calcular asientos:", error);
+    document.getElementById("mensaje-asientos").textContent =
+      "No se pudo cargar el mapa de asientos. Regresa e intenta de nuevo.";
+  }
+}
+
 function dibujarResumenViaje() {
   const contenedor = document.getElementById("resumen-viaje");
-  const precio = viajeEnCurso.catalogo.ruta.precioRutaCompleta;
-
   contenedor.innerHTML = `
-    <p><strong>Salida:</strong> ${viajeEnCurso.horario} hrs</p>
-    <p><strong>Precio por asiento:</strong> $${precio}</p>
+    <p><strong>Salida:</strong> ${viajeEnCurso.horaTexto} hrs</p>
+    <p><strong>Precio por asiento:</strong> $${configuracionApp.precioRutaCompleta}</p>
   `;
 }
 
-/**
- * Callback que seatMap.js llama cada vez que el usuario elige o
- * quita un asiento. Habilita el botón "Continuar" solo si hay al
- * menos un asiento elegido, y muestra cuántos lleva.
- */
 function alCambiarSeleccionDeAsientos(seleccionados) {
   const boton = document.getElementById("boton-continuar-asientos");
-
   boton.disabled = seleccionados.length === 0;
   boton.textContent =
     seleccionados.length === 0
@@ -179,11 +162,6 @@ function alCambiarSeleccionDeAsientos(seleccionados) {
       : `Continuar (${seleccionados.length} asiento${seleccionados.length > 1 ? "s" : ""})`;
 }
 
-/**
- * Conecta el botón "Continuar" de la pantalla de asientos: congela
- * la selección actual en viajeEnCurso.asientos, dibuja un formulario
- * de pasajero por cada asiento, y avanza de pantalla.
- */
 function configurarBotonContinuarAsientos() {
   const boton = document.getElementById("boton-continuar-asientos");
   boton.addEventListener("click", () => {
@@ -193,13 +171,6 @@ function configurarBotonContinuarAsientos() {
   });
 }
 
-/**
- * Genera dinámicamente un bloque de campos (nombre + teléfono) por
- * cada asiento elegido, dentro de #campos-pasajeros. Cada campo tiene
- * un id único ("nombre-asiento-3") para poder validarlo por separado.
- *
- * @param {number[]} asientos - números de asiento elegidos
- */
 function dibujarFormularioPasajeros(asientos) {
   const contenedor = document.getElementById("campos-pasajeros");
   contenedor.innerHTML = "";
@@ -224,11 +195,6 @@ function dibujarFormularioPasajeros(asientos) {
   }
 }
 
-/**
- * Conecta el envío del formulario de pasajeros: valida el nombre y
- * el teléfono de cada asiento con validation.js, y solo avanza a la
- * pantalla de modalidad si TODOS los campos son válidos.
- */
 function configurarFormularioPasajeros() {
   const formulario = document.getElementById("formulario-pasajeros");
 
@@ -268,9 +234,7 @@ function configurarFormularioPasajeros() {
       });
     }
 
-    if (!formularioValido) {
-      return; // los mensajes de error ya quedaron visibles en cada campo
-    }
+    if (!formularioValido) return;
 
     viajeEnCurso.pasajeros = pasajeros;
     reiniciarPantallaModalidad();
@@ -278,11 +242,6 @@ function configurarFormularioPasajeros() {
   });
 }
 
-/**
- * Conecta los botones y el formulario de la pantalla de modalidad:
- * "Apartar mi lugar", "Pagar en línea", el formulario de tarjeta
- * simulada, su botón de cancelar, y el botón para reservar otro boleto.
- */
 function configurarModalidad() {
   document
     .getElementById("boton-apartar")
@@ -295,18 +254,12 @@ function configurarModalidad() {
     .addEventListener("submit", manejarPago);
   document
     .getElementById("boton-cancelar-pago")
-    .addEventListener("click", () => {
-      reiniciarPantallaModalidad();
-    });
+    .addEventListener("click", reiniciarPantallaModalidad);
   document
     .getElementById("boton-nueva-compra")
     .addEventListener("click", reiniciarCompra);
 }
 
-/**
- * Deja la pantalla de modalidad en su estado inicial: opciones
- * visibles, formulario de pago oculto y limpio, sin mensajes de error.
- */
 function reiniciarPantallaModalidad() {
   document.getElementById("opciones-modalidad").hidden = false;
   document.getElementById("formulario-pago").hidden = true;
@@ -314,36 +267,10 @@ function reiniciarPantallaModalidad() {
   mostrarMensajeModalidad("");
 }
 
-/**
- * Se ejecuta al elegir "Apartar mi lugar": no pide datos extra,
- * solo revalida los asientos y guarda la reserva como "apartado".
- */
-function manejarApartar() {
-  if (!verificarAsientosSiguenDisponibles()) return;
-
-  const reserva = crearReserva({
-    fecha: viajeEnCurso.fecha,
-    horario: viajeEnCurso.horario,
-    asientos: viajeEnCurso.asientos,
-    pasajeros: viajeEnCurso.pasajeros,
-    modalidad: "apartado",
-  });
-
-  if (!reserva) {
-    mostrarMensajeModalidad(
-      "No se pudo guardar tu apartado. Intenta de nuevo.",
-    );
-    return;
-  }
-
-  dibujarComprobante(reserva);
-  mostrarPantalla("confirmacion");
+async function manejarApartar() {
+  await intentarCrearReserva("apartado");
 }
 
-/**
- * Se ejecuta al elegir "Pagar en línea": oculta las dos opciones y
- * dibuja el formulario de tarjeta simulada.
- */
 function mostrarFormularioPago() {
   dibujarCamposPago();
   document.getElementById("opciones-modalidad").hidden = true;
@@ -351,11 +278,6 @@ function mostrarFormularioPago() {
   mostrarMensajeModalidad("");
 }
 
-/**
- * Genera los campos del formulario de tarjeta simulada dentro de
- * #campos-pago: número, vencimiento y CVV, cada uno con su mensaje
- * de error correspondiente.
- */
 function dibujarCamposPago() {
   const contenedor = document.getElementById("campos-pago");
   contenedor.innerHTML = `
@@ -377,12 +299,7 @@ function dibujarCamposPago() {
   `;
 }
 
-/**
- * Se ejecuta al enviar el formulario de pago: valida los tres campos
- * de la tarjeta simulada, revalida los asientos, y si todo está bien
- * guarda la reserva como "confirmado" (pagado).
- */
-function manejarPago(evento) {
+async function manejarPago(evento) {
   evento.preventDefault();
 
   const inputNumero = document.getElementById("numero-tarjeta");
@@ -401,110 +318,84 @@ function manejarPago(evento) {
   );
   const cvvValido = validarCampo(inputCVV, "error-cvv-tarjeta", validarCVV);
 
-  if (!numeroValido || !vencimientoValido || !cvvValido) {
-    return; // los mensajes de error ya quedaron visibles en cada campo
-  }
+  if (!numeroValido || !vencimientoValido || !cvvValido) return;
 
-  if (!verificarAsientosSiguenDisponibles()) return;
-
-  const reserva = crearReserva({
-    fecha: viajeEnCurso.fecha,
-    horario: viajeEnCurso.horario,
-    asientos: viajeEnCurso.asientos,
-    pasajeros: viajeEnCurso.pasajeros,
-    modalidad: "confirmado",
-  });
-
-  if (!reserva) {
-    mostrarMensajeModalidad("No se pudo guardar tu pago. Intenta de nuevo.");
-    return;
-  }
-
-  dibujarComprobante(reserva);
-  mostrarPantalla("confirmacion");
+  await intentarCrearReserva("confirmado");
 }
 
 /**
- * Vuelve a calcular el estado de los asientos y confirma que los
- * que el usuario eligió sigan disponibles. Si alguno ya no lo está,
- * avisa y lo regresa a la pantalla de asientos con el mapa actualizado.
- *
- * @returns {boolean} true si todos los asientos elegidos siguen libres
+ * Intenta crear la reserva en el backend. Si el backend responde que
+ * un asiento ya no está disponible (409, gracias a la restricción
+ * UNIQUE + transacción que armamos), avisa y regresa a elegir de
+ * nuevo con el mapa actualizado. Cualquier otro error se muestra
+ * como mensaje genérico.
  */
-function verificarAsientosSiguenDisponibles() {
-  const estadosActuales = calcularEstadoAsientos(
-    viajeEnCurso.catalogo,
-    viajeEnCurso.fecha,
-    viajeEnCurso.horario,
-  );
+async function intentarCrearReserva(modalidad) {
+  try {
+    const { folio, venceEn } = await crearReserva({
+      fecha: viajeEnCurso.fecha,
+      horarioId: viajeEnCurso.horarioId,
+      asientos: viajeEnCurso.asientos,
+      pasajeros: viajeEnCurso.pasajeros,
+      modalidad,
+    });
 
-  const algunoYaNoDisponible = viajeEnCurso.asientos.some((numero) => {
-    const estado = estadosActuales.find((a) => a.numero === numero);
-    return !estado || estado.estado !== "disponible";
-  });
-
-  if (algunoYaNoDisponible) {
-    mostrarMensajeModalidad(
-      "Uno de tus asientos ya no está disponible. Elige de nuevo, por favor.",
-    );
-    renderizarMapaAsientos(estadosActuales, alCambiarSeleccionDeAsientos);
-    mostrarPantalla("asientos");
-    return false;
+    dibujarComprobante(folio, venceEn, modalidad);
+    mostrarPantalla("confirmacion");
+  } catch (error) {
+    if (error.status === 409) {
+      mostrarMensajeModalidad(
+        "Uno de tus asientos ya no está disponible. Elige de nuevo, por favor.",
+      );
+      const estados = await obtenerEstadoAsientos(
+        viajeEnCurso.fecha,
+        viajeEnCurso.horarioId,
+      );
+      renderizarMapaAsientos(estados, alCambiarSeleccionDeAsientos);
+      mostrarPantalla("asientos");
+    } else {
+      console.error("Error al crear la reserva:", error);
+      mostrarMensajeModalidad(
+        "No se pudo completar tu reserva. Intenta de nuevo.",
+      );
+    }
   }
-
-  return true;
 }
 
-/**
- * Muestra un mensaje corto en la pantalla de modalidad (errores o
- * avisos), o lo limpia si se le pasa una cadena vacía.
- */
 function mostrarMensajeModalidad(texto) {
   const contenedor = document.getElementById("mensaje-modalidad");
-  if (contenedor) {
-    contenedor.textContent = texto;
-  }
+  if (contenedor) contenedor.textContent = texto;
 }
 
-/**
- * Dibuja el comprobante final con el folio, el horario, los
- * pasajeros y, si aplica, la fecha límite para pagar/abordar.
- *
- * @param {Object} reserva - la reserva que regresó crearReserva()
- */
-function dibujarComprobante(reserva) {
+function dibujarComprobante(folio, venceEn, modalidad) {
   const contenedor = document.getElementById("comprobante");
 
-  const listaPasajeros = reserva.pasajeros
+  const listaPasajeros = viajeEnCurso.pasajeros
     .map(
       (p) => `<li>Asiento ${p.numeroAsiento}: ${p.nombre} — ${p.contacto}</li>`,
     )
     .join("");
 
   const textoModalidad =
-    reserva.modalidad === "apartado"
+    modalidad === "apartado"
       ? "Apartado (pagas al abordar)"
       : "Pagado en línea";
 
   const avisoVencimiento =
-    reserva.modalidad === "apartado"
-      ? `<p><strong>Debes abordar o pagar antes de:</strong> ${formatearFechaHoraLegible(reserva.vencePara)}</p>`
+    modalidad === "apartado"
+      ? `<p><strong>Debes abordar o pagar antes de:</strong> ${formatearFechaHoraLegible(venceEn)}</p>`
       : "";
 
   contenedor.innerHTML = `
     <h2>¡Listo! Este es tu comprobante</h2>
-    <p><strong>Folio:</strong> ${reserva.folio}</p>
-    <p><strong>Salida:</strong> ${reserva.horario} hrs, ${reserva.fecha}</p>
+    <p><strong>Folio:</strong> ${folio}</p>
+    <p><strong>Salida:</strong> ${viajeEnCurso.horaTexto} hrs, ${viajeEnCurso.fecha}</p>
     <p><strong>Modalidad:</strong> ${textoModalidad}</p>
     <ul>${listaPasajeros}</ul>
     ${avisoVencimiento}
   `;
 }
 
-/**
- * Convierte una fecha ISO ("2026-09-15T07:30:00.000Z") a un texto
- * legible en español, para mostrarla en el comprobante.
- */
 function formatearFechaHoraLegible(fechaISO) {
   const fecha = new Date(fechaISO);
   return fecha.toLocaleString("es-MX", {
@@ -513,13 +404,10 @@ function formatearFechaHoraLegible(fechaISO) {
   });
 }
 
-/**
- * Reinicia todo el estado del viaje en curso y regresa a la pantalla
- * de inicio, para que el usuario pueda reservar otro boleto.
- */
-function reiniciarCompra() {
+async function reiniciarCompra() {
   viajeEnCurso.fecha = null;
-  viajeEnCurso.horario = null;
+  viajeEnCurso.horarioId = null;
+  viajeEnCurso.horaTexto = null;
   viajeEnCurso.asientos = [];
   viajeEnCurso.pasajeros = [];
 
@@ -527,27 +415,18 @@ function reiniciarCompra() {
   reiniciarPantallaModalidad();
 
   mostrarPantalla("inicio");
+  await dibujarHorarios(); // por si mientras comprabas ya pasó otro horario
 }
 
-/**
- * Conecta todos los botones "← Volver" de la app, usando el atributo
- * data-volver para saber a qué pantalla regresar.
- */
 function configurarBotonesVolver() {
   const botones = document.querySelectorAll("[data-volver]");
   for (const boton of botones) {
-    boton.addEventListener("click", () => {
-      mostrarPantalla(boton.dataset.volver);
-    });
+    boton.addEventListener("click", () =>
+      mostrarPantalla(boton.dataset.volver),
+    );
   }
 }
 
-/**
- * Cambia cuál <section class="pantalla"> está visible, usando el
- * atributo data-pantalla para encontrarla.
- *
- * @param {string} nombrePantalla - ej. "inicio", "asientos", "pasajeros"
- */
 function mostrarPantalla(nombrePantalla) {
   const todasLasPantallas = document.querySelectorAll(".pantalla");
   for (const pantalla of todasLasPantallas) {

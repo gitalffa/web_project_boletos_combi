@@ -1,0 +1,8 @@
+# Nunca subir las dependencias instaladas (se reinstalan con npm install)
+node_modules/
+
+# Nunca subir credenciales reales
+.env
+
+# Sistema operativo / editor
+.DS_Store

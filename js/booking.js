@@ -12,7 +12,7 @@ import {
   obtenerReservas,
   reemplazarReservas,
   guardarReserva,
-} from "./dataService.js";
+} from "./dataService.js?v=1";
 
 const MINUTOS_LIMITE_APARTADO = 30;
 

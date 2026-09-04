@@ -1,119 +1,112 @@
 /**
  * dataService.js
  * -----------------------------------------------------------------
- * Única puerta de entrada a los datos de la app.
+ * Única puerta de entrada a los datos de la app. Ahora habla con tu
+ * API real (Express + MySQL) en vez de fetch a un JSON + localStorage.
  *
- * El resto del código (seatMap.js, booking.js, index.js) NUNCA debe
- * llamar a fetch() ni a localStorage directamente: siempre pasa por
- * las funciones de este archivo. Así, el día que haya un backend en
- * PHP/MySQL, solo hay que reescribir el INTERIOR de estas funciones
- * (para que hagan peticiones a la API real) sin tocar el resto del
- * proyecto.
+ * El resto del código (seatMap.js, index.js) sigue sin saber nada
+ * de cómo se obtienen los datos por dentro — por eso este cambio
+ * de JSON/localStorage a una API real no afecta a los demás archivos.
  * -----------------------------------------------------------------
  */
 
-const RUTA_JSON_VIAJES = "./data/viajes.json";
-const LLAVE_RESERVAS = "combi-tepic-batanga:reservas";
-
-// Guardamos el catálogo en memoria una vez que se carga, para no
-// pedirlo con fetch cada vez que alguna otra parte del código lo necesite.
-let catalogoEnMemoria = null;
+// Cambia esto cuando muevas el backend a producción (tu propio
+// dominio/VPS), es el único lugar donde vive esta URL.
+const URL_BASE_API = "http://localhost:3000/api";
 
 /**
- * Carga el catálogo fijo del viaje (ruta, paradas, precio, capacidad,
- * horarios). Lo pide por fetch solo la primera vez; después reutiliza
- * lo que ya tiene en memoria.
+ * Revisa la respuesta de fetch: si el backend respondió con un
+ * error (estado 4xx/5xx), convierte ese error en una excepción con
+ * un mensaje claro, en vez de dejar que el resto del código siga
+ * como si nada.
  *
- * @returns {Promise<Object>} el catálogo, o null si falló la carga.
+ * @param {Response} respuesta
+ * @returns {Promise<Object>} el cuerpo ya convertido a JSON
  */
-export async function obtenerCatalogo() {
-  if (catalogoEnMemoria) {
-    return catalogoEnMemoria;
+async function manejarRespuesta(respuesta) {
+  const datos = await respuesta.json();
+
+  if (!respuesta.ok) {
+    const error = new Error(datos.mensaje || "Ocurrió un error inesperado");
+    error.status = respuesta.status; // conservamos el código (ej. 409) para usarlo después
+    throw error;
   }
 
-  try {
-    const respuesta = await fetch(RUTA_JSON_VIAJES);
-
-    if (!respuesta.ok) {
-      throw new Error(`El servidor respondió con estado ${respuesta.status}`);
-    }
-
-    catalogoEnMemoria = await respuesta.json();
-    return catalogoEnMemoria;
-  } catch (error) {
-    console.error("No se pudo cargar el catálogo de viajes:", error);
-    return null;
-  }
+  return datos;
 }
 
 /**
- * Da los horarios del día que corresponden (lunes a sábado, o domingo)
- * a partir de un objeto Date. No necesita async porque no toca fetch
- * ni localStorage, solo trabaja con datos que ya recibió.
+ * Da el precio, la capacidad del vehículo y los minutos de
+ * expiración del apartado.
  *
- * @param {Object} catalogo - el catálogo ya cargado con obtenerCatalogo()
- * @param {Date} fecha - la fecha a consultar
- * @returns {string[]} lista de horarios en formato "HH:MM"
+ * @returns {Promise<{precioRutaCompleta: number, capacidadVehiculo: number, minutosLimiteApartado: number}>}
  */
-export function obtenerHorariosDelDia(catalogo, fecha) {
-  const ESDOMINGO = 0; // Date.getDay() regresa 0 para domingo
-  const esDomingo = fecha.getDay() === ESDOMINGO;
-
-  return esDomingo
-    ? catalogo.horariosPorDia.domingo
-    : catalogo.horariosPorDia.lunesASabado;
+export async function obtenerConfiguracion() {
+  const respuesta = await fetch(`${URL_BASE_API}/configuracion`);
+  const datos = await manejarRespuesta(respuesta);
+  return datos.configuracion;
 }
 
 /**
- * Lee todas las reservas guardadas (apartadas o pagadas) desde
- * localStorage. Si no hay ninguna todavía, regresa un array vacío
- * en vez de null, para que el resto del código no tenga que estar
- * revisando si es null antes de usarlo.
+ * Da la lista de paradas intermedias, en orden.
  *
- * @returns {Array<Object>} lista de reservas
+ * @returns {Promise<string[]>}
  */
-export function obtenerReservas() {
-  try {
-    const crudo = localStorage.getItem(LLAVE_RESERVAS);
-    return crudo ? JSON.parse(crudo) : [];
-  } catch (error) {
-    console.error("No se pudieron leer las reservas guardadas:", error);
-    return [];
-  }
+export async function obtenerParadas() {
+  const respuesta = await fetch(`${URL_BASE_API}/paradas`);
+  const datos = await manejarRespuesta(respuesta);
+  return datos.paradas;
 }
 
 /**
- * Agrega una nueva reserva a la lista guardada en localStorage.
+ * Da los horarios válidos para una fecha (ya filtrados por domingo
+ * y por los que ya salieron hoy — esa lógica ahora vive en el
+ * backend, no aquí).
  *
- * @param {Object} reserva - objeto con los datos de la reserva
- *   (ver booking.js para la forma exacta de este objeto)
- * @returns {boolean} true si se guardó con éxito
+ * @param {string} fecha - "AAAA-MM-DD"
+ * @returns {Promise<Array<{id: number, hora: string}>>}
  */
-export function guardarReserva(reserva) {
-  try {
-    const reservas = obtenerReservas();
-    reservas.push(reserva);
-    localStorage.setItem(LLAVE_RESERVAS, JSON.stringify(reservas));
-    return true;
-  } catch (error) {
-    console.error("No se pudo guardar la reserva:", error);
-    return false;
-  }
+export async function obtenerHorarios(fecha) {
+  const respuesta = await fetch(`${URL_BASE_API}/horarios?fecha=${fecha}`);
+  const datos = await manejarRespuesta(respuesta);
+  return datos.horarios;
 }
 
 /**
- * Reemplaza la lista completa de reservas. La usa booking.js cuando
- * necesita "limpiar" reservas vencidas (apartados que expiraron).
+ * Da el estado (disponible/apartado/confirmado) de cada asiento
+ * para un viaje específico.
  *
- * @param {Array<Object>} reservas - la lista ya actualizada
- * @returns {boolean} true si se guardó con éxito
+ * @param {string} fecha - "AAAA-MM-DD"
+ * @param {number} horarioId
+ * @returns {Promise<Array<{numero: number, estado: string}>>}
  */
-export function reemplazarReservas(reservas) {
-  try {
-    localStorage.setItem(LLAVE_RESERVAS, JSON.stringify(reservas));
-    return true;
-  } catch (error) {
-    console.error("No se pudo actualizar la lista de reservas:", error);
-    return false;
-  }
+export async function obtenerEstadoAsientos(fecha, horarioId) {
+  const respuesta = await fetch(
+    `${URL_BASE_API}/asientos?fecha=${fecha}&horarioId=${horarioId}`,
+  );
+  const datos = await manejarRespuesta(respuesta);
+  return datos.asientos;
+}
+
+/**
+ * Crea una reserva nueva (apartado o pago). Si alguno de los
+ * asientos ya no está disponible, el backend responde con error y
+ * esta función lo convierte en una excepción con mensaje claro.
+ *
+ * @param {Object} datosReserva
+ * @param {string} datosReserva.fecha
+ * @param {number} datosReserva.horarioId
+ * @param {number[]} datosReserva.asientos
+ * @param {Array<{numeroAsiento: number, nombre: string, contacto: string}>} datosReserva.pasajeros
+ * @param {"apartado"|"confirmado"} datosReserva.modalidad
+ * @returns {Promise<{folio: string, venceEn: string|null}>}
+ */
+export async function crearReserva(datosReserva) {
+  const respuesta = await fetch(`${URL_BASE_API}/reservas`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datosReserva),
+  });
+
+  return manejarRespuesta(respuesta);
 }
