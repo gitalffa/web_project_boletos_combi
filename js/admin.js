@@ -1,0 +1,398 @@
+/**
+ * admin.js
+ * -----------------------------------------------------------------
+ * Arranque del panel de admin: login y navegación entre secciones.
+ * -----------------------------------------------------------------
+ */
+
+import {
+  iniciarSesion,
+  hayTokenGuardado,
+  cerrarSesion,
+  obtenerConfiguracion,
+  actualizarConfiguracion,
+  obtenerHorariosAdmin,
+  crearHorario,
+  actualizarHorario,
+  borrarHorario,
+  obtenerParadasAdmin,
+  crearParada,
+  actualizarParada,
+  borrarParada,
+  obtenerReservasDelDia,
+  marcarComoPagado,
+  reactivarHorario,
+  obtenerEstadisticas,
+} from "./adminService.js?v=1";
+
+function iniciar() {
+  if (hayTokenGuardado()) {
+    mostrarPantalla("panel");
+    cargarConfiguracion();
+    cargarHorarios();
+    cargarParadas();
+  }
+
+  configurarLogin();
+  configurarTabs();
+  configurarFormularioConfiguracion();
+  configurarFormularioHorario();
+  configurarFormularioParada();
+  configurarReservas();
+  configurarEstadisticas();
+}
+
+function configurarLogin() {
+  const formulario = document.getElementById("formulario-login");
+
+  formulario.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const contraseña = document.getElementById("contraseña-admin").value;
+    const mensajeError = document.getElementById("error-login");
+
+    try {
+      await iniciarSesion(contraseña);
+      mensajeError.textContent = "";
+      mostrarPantalla("panel");
+      cargarConfiguracion();
+      cargarHorarios();
+      cargarParadas();
+    } catch (error) {
+      mensajeError.textContent =
+        error.status === 401
+          ? "Contraseña incorrecta"
+          : "No se pudo iniciar sesión";
+      mensajeError.style.display = "block";
+    }
+  });
+}
+
+function mostrarPantalla(nombre) {
+  document
+    .getElementById("pantalla-login")
+    .classList.toggle("activa", nombre === "login");
+  document
+    .getElementById("pantalla-panel")
+    .classList.toggle("activa", nombre === "panel");
+}
+
+function configurarTabs() {
+  const tabs = document.querySelectorAll(".tab-admin");
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      for (const otraTab of tabs) otraTab.classList.remove("activa");
+      tab.classList.add("activa");
+
+      const secciones = document.querySelectorAll(".seccion-admin");
+      for (const seccion of secciones) {
+        seccion.classList.toggle(
+          "activa",
+          seccion.id === `seccion-${tab.dataset.tab}`,
+        );
+      }
+
+      // Limpia cualquier mensaje de error/aviso que haya quedado de
+      // una sección anterior, para no confundir con algo que ya no aplica.
+      const mensajes = document.querySelectorAll(
+        ".seccion-admin .texto-ayuda[aria-live]",
+      );
+      for (const mensaje of mensajes) {
+        mensaje.textContent = "";
+      }
+    });
+  }
+}
+
+async function cargarConfiguracion() {
+  try {
+    const config = await obtenerConfiguracion();
+    document.getElementById("precio-ruta").value = config.precioRutaCompleta;
+    document.getElementById("capacidad-vehiculo").value =
+      config.capacidadVehiculo;
+    document.getElementById("minutos-limite").value =
+      config.minutosLimiteApartado;
+  } catch (error) {
+    if (error.status === 401) {
+      cerrarSesion();
+      mostrarPantalla("login");
+    }
+  }
+}
+
+function configurarFormularioConfiguracion() {
+  const formulario = document.getElementById("formulario-configuracion");
+
+  formulario.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const mensaje = document.getElementById("mensaje-configuracion");
+
+    try {
+      await actualizarConfiguracion({
+        precioRutaCompleta: Number(
+          document.getElementById("precio-ruta").value,
+        ),
+        capacidadVehiculo: Number(
+          document.getElementById("capacidad-vehiculo").value,
+        ),
+        minutosLimiteApartado: Number(
+          document.getElementById("minutos-limite").value,
+        ),
+      });
+      mensaje.textContent = "Cambios guardados correctamente.";
+    } catch (error) {
+      mensaje.textContent = "No se pudieron guardar los cambios.";
+    }
+  });
+}
+
+// ---------- Horarios ----------
+
+async function cargarHorarios() {
+  const horarios = await obtenerHorariosAdmin();
+  const cuerpoTabla = document.getElementById("tabla-horarios");
+  cuerpoTabla.innerHTML = "";
+
+  for (const horario of horarios) {
+    const fila = document.createElement("tr");
+    const botonEstado = horario.activo
+      ? `<button type="button" class="boton-chico boton-chico--peligro" data-borrar="${horario.id}">Desactivar</button>`
+      : `<button type="button" class="boton-chico" data-reactivar="${horario.id}">Reactivar</button>`;
+
+    fila.innerHTML = `
+      <td>${horario.hora.slice(0, 5)} ${horario.activo ? "" : "(inactivo)"}</td>
+      <td>${horario.aplica_domingo ? "Sí" : "No"}</td>
+      <td>
+        <button type="button" class="boton-chico" data-editar="${horario.id}">Editar</button>
+        ${botonEstado}
+      </td>
+    `;
+    cuerpoTabla.appendChild(fila);
+
+    fila.querySelector("[data-editar]").addEventListener("click", () => {
+      document.getElementById("horario-id-editando").value = horario.id;
+      document.getElementById("horario-hora").value = horario.hora.slice(0, 5);
+      document.getElementById("horario-domingo").checked = Boolean(
+        horario.aplica_domingo,
+      );
+      document.getElementById("boton-guardar-horario").textContent =
+        "Actualizar horario";
+      document.getElementById("boton-cancelar-horario").hidden = false;
+    });
+
+    const botonBorrar = fila.querySelector("[data-borrar]");
+    if (botonBorrar) {
+      botonBorrar.addEventListener("click", async () => {
+        await borrarHorario(horario.id);
+        cargarHorarios();
+      });
+    }
+
+    const botonReactivar = fila.querySelector("[data-reactivar]");
+    if (botonReactivar) {
+      botonReactivar.addEventListener("click", async () => {
+        await reactivarHorario(horario.id);
+        cargarHorarios();
+      });
+    }
+  }
+}
+
+function limpiarFormularioHorario() {
+  document.getElementById("formulario-horario").reset();
+  document.getElementById("horario-id-editando").value = "";
+  document.getElementById("horario-domingo").checked = true;
+  document.getElementById("boton-guardar-horario").textContent =
+    "Agregar horario";
+  document.getElementById("boton-cancelar-horario").hidden = true;
+  document.getElementById("mensaje-horarios").textContent = "";
+}
+
+function configurarFormularioHorario() {
+  document
+    .getElementById("boton-cancelar-horario")
+    .addEventListener("click", limpiarFormularioHorario);
+
+  document
+    .getElementById("formulario-horario")
+    .addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const mensaje = document.getElementById("mensaje-horarios");
+      mensaje.textContent = ""; // limpiamos cualquier error de un intento anterior
+      const idEditando = document.getElementById("horario-id-editando").value;
+
+      const datos = {
+        hora: document.getElementById("horario-hora").value,
+        aplicaDomingo: document.getElementById("horario-domingo").checked,
+      };
+
+      try {
+        if (idEditando) {
+          await actualizarHorario(idEditando, datos);
+        } else {
+          await crearHorario(datos);
+        }
+        limpiarFormularioHorario();
+        mensaje.textContent = "";
+        cargarHorarios();
+      } catch (error) {
+        mensaje.textContent = error.message;
+      }
+    });
+}
+
+// ---------- Paradas ----------
+
+async function cargarParadas() {
+  const paradas = await obtenerParadasAdmin();
+  const cuerpoTabla = document.getElementById("tabla-paradas");
+  cuerpoTabla.innerHTML = "";
+
+  for (const parada of paradas) {
+    const fila = document.createElement("tr");
+    fila.innerHTML = `
+      <td>${parada.orden}</td>
+      <td>${parada.nombre}</td>
+      <td>
+        <button type="button" class="boton-chico" data-editar="${parada.id}">Editar</button>
+        <button type="button" class="boton-chico boton-chico--peligro" data-borrar="${parada.id}">Borrar</button>
+      </td>
+    `;
+    cuerpoTabla.appendChild(fila);
+
+    fila.querySelector("[data-editar]").addEventListener("click", () => {
+      document.getElementById("parada-id-editando").value = parada.id;
+      document.getElementById("parada-orden").value = parada.orden;
+      document.getElementById("parada-nombre").value = parada.nombre;
+      document.getElementById("boton-guardar-parada").textContent =
+        "Actualizar parada";
+      document.getElementById("boton-cancelar-parada").hidden = false;
+    });
+
+    fila.querySelector("[data-borrar]").addEventListener("click", async () => {
+      const mensaje = document.getElementById("mensaje-paradas");
+      try {
+        await borrarParada(parada.id);
+        cargarParadas();
+      } catch (error) {
+        mensaje.textContent = error.message;
+      }
+    });
+  }
+}
+
+function limpiarFormularioParada() {
+  document.getElementById("formulario-parada").reset();
+  document.getElementById("parada-id-editando").value = "";
+  document.getElementById("boton-guardar-parada").textContent =
+    "Agregar parada";
+  document.getElementById("boton-cancelar-parada").hidden = true;
+  document.getElementById("mensaje-paradas").textContent = "";
+}
+
+function configurarFormularioParada() {
+  document
+    .getElementById("boton-cancelar-parada")
+    .addEventListener("click", limpiarFormularioParada);
+
+  document
+    .getElementById("formulario-parada")
+    .addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const mensaje = document.getElementById("mensaje-paradas");
+      mensaje.textContent = ""; // limpiamos cualquier error de un intento anterior
+      const idEditando = document.getElementById("parada-id-editando").value;
+
+      const datos = {
+        orden: Number(document.getElementById("parada-orden").value),
+        nombre: document.getElementById("parada-nombre").value.trim(),
+      };
+
+      try {
+        if (idEditando) {
+          await actualizarParada(idEditando, datos);
+        } else {
+          await crearParada(datos);
+        }
+        limpiarFormularioParada();
+        mensaje.textContent = "";
+        cargarParadas();
+      } catch (error) {
+        mensaje.textContent = error.message;
+      }
+    });
+}
+
+// ---------- Reservas del día ----------
+
+function configurarReservas() {
+  const inputFecha = document.getElementById("fecha-reservas");
+  inputFecha.valueAsDate = new Date(); // arranca mostrando el día de hoy
+
+  document
+    .getElementById("boton-buscar-reservas")
+    .addEventListener("click", () => {
+      cargarReservas(inputFecha.value);
+    });
+}
+
+async function cargarReservas(fecha) {
+  const reservas = await obtenerReservasDelDia(fecha);
+  const cuerpoTabla = document.getElementById("tabla-reservas");
+  cuerpoTabla.innerHTML = "";
+
+  for (const reserva of reservas) {
+    const esApartado = reserva.modalidad === "apartado";
+    const fila = document.createElement("tr");
+    fila.innerHTML = `
+      <td>${reserva.hora.slice(0, 5)}</td>
+      <td>${reserva.numero_asiento}</td>
+      <td>${reserva.nombre_pasajero}</td>
+      <td>${reserva.telefono_pasajero}</td>
+      <td>${esApartado ? "Apartado" : "Pagado"}</td>
+      <td>${esApartado ? `<button type="button" class="boton-chico" data-pagar="${reserva.id}">Marcar pagado</button>` : ""}</td>
+    `;
+    cuerpoTabla.appendChild(fila);
+
+    const botonPagar = fila.querySelector("[data-pagar]");
+    if (botonPagar) {
+      botonPagar.addEventListener("click", async () => {
+        await marcarComoPagado(reserva.id);
+        cargarReservas(fecha);
+      });
+    }
+  }
+}
+function configurarEstadisticas() {
+  const hoy = new Date();
+  const inicioDeMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+  document.getElementById("estadisticas-fecha-inicio").valueAsDate =
+    inicioDeMes;
+  document.getElementById("estadisticas-fecha-fin").valueAsDate = hoy;
+
+  document
+    .getElementById("boton-buscar-estadisticas")
+    .addEventListener("click", () => {
+      const inicio = document.getElementById("estadisticas-fecha-inicio").value;
+      const fin = document.getElementById("estadisticas-fecha-fin").value;
+      cargarEstadisticas(inicio, fin);
+    });
+}
+
+async function cargarEstadisticas(fechaInicio, fechaFin) {
+  const est = await obtenerEstadisticas(fechaInicio, fechaFin);
+  const totalBoletos =
+    est.apartadosVigentes +
+    est.apartadosVencidos +
+    est.pagadosEnLinea +
+    est.pagadosEfectivo;
+
+  document.getElementById("tabla-estadisticas").innerHTML = `
+    <tr><td>Apartados vigentes (sin pagar todavía)</td><td>${est.apartadosVigentes}</td></tr>
+    <tr><td>Apartados vencidos (no llegaron a tiempo)</td><td>${est.apartadosVencidos}</td></tr>
+    <tr><td>Pagados en línea</td><td>${est.pagadosEnLinea}</td></tr>
+    <tr><td>Pagados en efectivo (marcados por admin)</td><td>${est.pagadosEfectivo}</td></tr>
+    <tr><td><strong>Total de boletos</strong></td><td><strong>${totalBoletos}</strong></td></tr>
+  `;
+}
+iniciar();

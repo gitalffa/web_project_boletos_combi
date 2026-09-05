@@ -67,9 +67,9 @@ routerReservas.post("/", async (peticion, respuesta) => {
     const folio = generarFolio();
 
     const [resultadoReserva] = await conexion.query(
-      `INSERT INTO reservas (folio, fecha, horario_id, modalidad, vence_en)
-       VALUES (?, ?, ?, ?, ?)`,
-      [folio, fecha, horarioId, modalidad, venceEn],
+      `INSERT INTO reservas (folio, fecha, horario_id, modalidad, vence_en, pagado_en_linea)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [folio, fecha, horarioId, modalidad, venceEn, modalidad === "confirmado"],
     );
 
     const reservaId = resultadoReserva.insertId;
@@ -107,12 +107,10 @@ routerReservas.post("/", async (peticion, respuesta) => {
 
     const asientoOcupado = error.code === "ER_DUP_ENTRY";
     if (asientoOcupado) {
-      return respuesta
-        .status(409)
-        .json({
-          estado: "error",
-          mensaje: "Uno de los asientos ya no está disponible",
-        });
+      return respuesta.status(409).json({
+        estado: "error",
+        mensaje: "Uno de los asientos ya no está disponible",
+      });
     }
 
     console.error("Error al crear la reserva:", error);

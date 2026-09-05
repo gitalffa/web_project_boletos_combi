@@ -17,7 +17,9 @@ routerHorarios.get("/", async (peticion, respuesta) => {
   const { fecha } = peticion.query;
 
   if (!fecha) {
-    return respuesta.status(400).json({ estado: "error", mensaje: "Falta el parámetro fecha" });
+    return respuesta
+      .status(400)
+      .json({ estado: "error", mensaje: "Falta el parámetro fecha" });
   }
 
   try {
@@ -27,8 +29,8 @@ routerHorarios.get("/", async (peticion, respuesta) => {
     // Si es domingo, solo traemos los horarios que aplican domingo;
     // cualquier otro día, traemos todos.
     const consulta = esDomingo
-      ? "SELECT id, hora FROM horarios WHERE aplica_domingo = TRUE ORDER BY hora"
-      : "SELECT id, hora FROM horarios ORDER BY hora";
+      ? "SELECT id, hora FROM horarios WHERE aplica_domingo = TRUE AND activo = TRUE ORDER BY hora"
+      : "SELECT id, hora FROM horarios WHERE activo = TRUE ORDER BY hora";
 
     const [horarios] = await pool.query(consulta);
     const ahora = new Date();
@@ -40,6 +42,9 @@ routerHorarios.get("/", async (peticion, respuesta) => {
     respuesta.json({ estado: "ok", horarios: horariosFuturos });
   } catch (error) {
     console.error("Error al consultar horarios:", error);
-    respuesta.status(500).json({ estado: "error", mensaje: "No se pudieron obtener los horarios" });
+    respuesta.status(500).json({
+      estado: "error",
+      mensaje: "No se pudieron obtener los horarios",
+    });
   }
 });

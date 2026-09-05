@@ -16,6 +16,13 @@ import { routerAsientos } from "./routes/asientos.js";
 import { routerReservas } from "./routes/reservas.js";
 import { routerConfiguracion } from "./routes/configuracion.js";
 import { routerParadas } from "./routes/paradas.js";
+import { routerAdminLogin } from "./routes/adminLogin.js";
+import { verificarAdmin } from "./middleware/verificarAdmin.js";
+import { routerAdminConfiguracion } from "./routes/adminConfiguracion.js";
+import { routerAdminHorarios } from "./routes/adminHorarios.js";
+import { routerAdminParadas } from "./routes/adminParadas.js";
+import { routerAdminReservas } from "./routes/adminReservas.js";
+import { routerAdminEstadisticas } from "./routes/adminEstadisticas.js";
 
 dotenv.config();
 
@@ -30,6 +37,12 @@ app.use("/api/asientos", routerAsientos);
 app.use("/api/reservas", routerReservas);
 app.use("/api/configuracion", routerConfiguracion);
 app.use("/api/paradas", routerParadas);
+app.use("/api/admin/login", routerAdminLogin);
+app.use("/api/admin/configuracion", verificarAdmin, routerAdminConfiguracion);
+app.use("/api/admin/horarios", verificarAdmin, routerAdminHorarios);
+app.use("/api/admin/paradas", verificarAdmin, routerAdminParadas);
+app.use("/api/admin/reservas", verificarAdmin, routerAdminReservas);
+app.use("/api/admin/estadisticas", verificarAdmin, routerAdminEstadisticas);
 
 /**
  * Ruta de prueba simple: solo confirma que el servidor está vivo.

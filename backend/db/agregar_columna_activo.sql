@@ -1,0 +1,3 @@
+USE boletos_combi;
+
+ALTER TABLE horarios ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE;

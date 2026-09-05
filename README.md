@@ -13,23 +13,27 @@ a producción.
 
 ## Estado del proyecto
 
-✅ MVP funcional de principio a fin, con backend real — en fase de pruebas.
+✅ MVP funcional de principio a fin, con backend real y panel de
+administración — en fase de pruebas.
 
 ## Arquitectura
 
 ```
-Frontend (navegador)  →  fetch  →  API Express  →  MySQL
-      js/                        backend/
+Frontend (cliente)     →  fetch  →  API Express  →  MySQL
+      js/                          backend/
+Frontend (admin)       →  fetch (con token JWT)  ↗
+      admin.html + js/adminService.js
 ```
 
-El frontend ya NO usa `localStorage` ni el JSON estático para datos de
-reservas — todo el inventario de asientos vive en una base de datos
-MySQL compartida por todos los usuarios, con una restricción `UNIQUE`
-que evita que dos personas reserven el mismo asiento al mismo tiempo
-(ver `backend/db/schema.sql`).
+El frontend del cliente ya NO usa `localStorage` ni el JSON estático
+para datos de reservas — todo el inventario de asientos vive en una
+base de datos MySQL compartida por todos los usuarios, con una
+restricción `UNIQUE` que evita que dos personas reserven el mismo
+asiento al mismo tiempo (ver `backend/db/schema.sql`).
 
 ## Funcionalidades del MVP
 
+**App del cliente**
 - [x] Ver horarios de salida del día (con regla especial para domingo),
       calculados en el backend
 - [x] Ocultar automáticamente los horarios que ya salieron hoy
@@ -40,11 +44,26 @@ que evita que dos personas reserven el mismo asiento al mismo tiempo
 - [x] Elegir entre "apartar el lugar" (pago al abordar) o "pagar en línea"
       (tarjeta simulada, con validación de número, vencimiento y CVV)
 - [x] Vencimiento automático de los apartados (30 min antes de la salida)
-- [x] Backend real en Node/Express + MySQL, con protección contra
-      doble-apartado a nivel de base de datos (transacciones + restricción UNIQUE)
 - [x] Revalidación de asientos si otro usuario se adelantó (error 409)
 - [x] Comprobante con folio al terminar la compra
-- [x] Reiniciar el flujo para reservar otro boleto
+
+**Backend**
+- [x] Node/Express + MySQL, con protección contra doble-apartado a nivel
+      de base de datos (transacciones + restricción UNIQUE)
+- [x] Protección contra horarios duplicados (restricción UNIQUE en `hora`)
+
+**Panel de administración** (`admin.html`)
+- [x] Login con contraseña (hash con `bcrypt`) + sesión con token JWT
+- [x] Editar precio, capacidad del vehículo y minutos de expiración
+- [x] Administrar horarios: crear, editar, desactivar/reactivar
+      (borrado suave — nunca se borra un horario con reservas históricas)
+- [x] Administrar paradas intermedias: crear, editar, borrar
+- [x] Ver reservas de un día específico (horario, asiento, pasajero, teléfono)
+- [x] Marcar un "apartado" como pagado en efectivo, sin que se libere
+      al llegar su hora límite
+- [x] Estadísticas por rango de fechas: apartados vigentes/vencidos,
+      pagados en línea, pagados en efectivo (distinguiendo el origen
+      real del pago aunque el admin lo marque después)
 
 ## Pendiente / mejoras futuras
 
@@ -52,10 +71,13 @@ que evita que dos personas reserven el mismo asiento al mismo tiempo
       funcione con reservas reales, no solo en local
 - [ ] Boletos por tramo (subir/bajar en paradas intermedias), no solo ruta completa
 - [ ] Pasarela de pago real (Conekta/OpenPay/Stripe) en vez de la simulada
-- [ ] Selector de fecha (por ahora la app solo muestra los horarios de "hoy")
-- [ ] Panel para que el transportista administre horarios y precios
+- [ ] Selector de fecha en la app del cliente (por ahora solo horarios de "hoy")
 - [ ] Quitar `js/booking.js` y `data/viajes.json` del frontend (ya no se
       usan, la lógica vive ahora en el backend)
+- [ ] Vulnerabilidad moderada conocida en `qs` (dependencia de Express 4.x):
+      no explotable con nuestra configuración actual (requiere una opción
+      que no usamos), pendiente de resolver con un parche oficial o al
+      migrar a Express 5 más adelante — ver `npm audit`
 
 ## Cómo correrlo localmente
 
@@ -66,68 +88,116 @@ distintas:
 ```bash
 cd backend
 npm install
-cp .env.example .env   # y llena tu contraseña real de MySQL ahí
+cp .env.example .env   # y llena tus datos reales ahí (MySQL, ADMIN_PASSWORD_HASH, JWT_SECRET)
 npm run dev
 ```
 Debe quedar corriendo en `http://localhost:3000`.
 
 **2. Frontend**
 Con la extensión **Live Server** de VS Code: clic derecho sobre
-`index.html` → "Open with Live Server". Debe abrir en un puerto distinto
-(normalmente `5500`) — es normal y necesario que sean puertos diferentes.
+`index.html` (app del cliente) o `admin.html` (panel de administración)
+→ "Open with Live Server". Debe abrir en un puerto distinto (normalmente
+`5500`) — es normal y necesario que sean puertos diferentes al del backend.
 
-**Base de datos**: antes de la primera vez, corre el esquema:
+**Base de datos**: antes de la primera vez, corre el esquema y las
+migraciones, en este orden:
 ```bash
 sudo mysql < backend/db/schema.sql
 mysql -u combi_app -p boletos_combi < backend/db/seed_paradas.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_columna_activo.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_restriccion_hora_unica.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_columna_pagado_en_linea.sql
+```
+
+**Credenciales del admin**: genera tu contraseña y el secreto de sesión
+con los scripts incluidos, y pégalos en tu `.env` (ver más abajo):
+```bash
+node backend/scripts/generar-hash-contrasena.js "TuContraseñaAquí"
+node backend/scripts/generar-secreto-jwt.js
 ```
 
 ## Estructura del proyecto
 
 ```
 web_project_boletos_combi/
-├── index.html
+├── index.html                 # app del cliente
+├── admin.html                  # panel de administración
 ├── README.md
 ├── .gitignore
 ├── css/
-│   └── styles.css
+│   ├── styles.css               # estilos compartidos
+│   └── admin.css                 # estilos exclusivos del panel de admin
 ├── data/
 │   └── viajes.json        # OBSOLETO, ya no lo usa la app (ver Pendiente)
 ├── js/                      # ---------- FRONTEND ----------
-│   ├── dataService.js       # capa de acceso a datos (fetch a la API real)
-│   ├── booking.js            # OBSOLETO, la lógica ahora vive en el backend
-│   ├── seatMap.js             # mapa de asientos y selección
-│   ├── validation.js          # validación de formularios (pasajero y pago)
-│   └── index.js                # arranque de la app y navegación entre pantallas
+│   ├── dataService.js       # capa de acceso a datos del cliente (fetch a la API)
+│   ├── adminService.js       # capa de acceso a datos del panel de admin (fetch + token)
+│   ├── booking.js              # OBSOLETO, la lógica ahora vive en el backend
+│   ├── seatMap.js                # mapa de asientos y selección
+│   ├── validation.js              # validación de formularios (pasajero y pago)
+│   ├── index.js                    # arranque de la app del cliente
+│   └── admin.js                     # arranque del panel de admin
 └── backend/                  # ---------- BACKEND ----------
     ├── package.json
     ├── .env.example            # plantilla de variables de entorno (sin datos reales)
     ├── server.js                # arranque de Express y registro de rutas
+    ├── scripts/
+    │   ├── generar-hash-contrasena.js  # genera ADMIN_PASSWORD_HASH
+    │   └── generar-secreto-jwt.js       # genera JWT_SECRET
+    ├── middleware/
+    │   └── verificarAdmin.js       # protege las rutas /api/admin/*
     ├── db/
-    │   ├── schema.sql             # esquema de la base de datos
-    │   ├── seed_paradas.sql       # datos iniciales de paradas intermedias
-    │   └── connection.js           # pool de conexiones a MySQL
+    │   ├── schema.sql                        # esquema base de la base de datos
+    │   ├── seed_paradas.sql                   # datos iniciales de paradas intermedias
+    │   ├── agregar_columna_activo.sql          # migración: borrado suave de horarios
+    │   ├── agregar_restriccion_hora_unica.sql   # migración: horarios sin duplicados
+    │   ├── agregar_columna_pagado_en_linea.sql   # migración: origen real del pago
+    │   └── connection.js                          # pool de conexiones a MySQL
     └── routes/
-        ├── horarios.js             # GET  /api/horarios
-        ├── asientos.js              # GET  /api/asientos
-        ├── reservas.js               # POST /api/reservas (con transacción)
-        ├── configuracion.js           # GET  /api/configuracion
-        └── paradas.js                  # GET  /api/paradas
+        ├── horarios.js              # GET  /api/horarios              (cliente)
+        ├── asientos.js               # GET  /api/asientos              (cliente)
+        ├── reservas.js                # POST /api/reservas (con transacción) (cliente)
+        ├── configuracion.js            # GET  /api/configuracion        (cliente)
+        ├── paradas.js                   # GET  /api/paradas             (cliente)
+        ├── adminLogin.js                  # POST /api/admin/login
+        ├── adminConfiguracion.js           # GET/PUT /api/admin/configuracion
+        ├── adminHorarios.js                 # CRUD /api/admin/horarios (con borrado suave)
+        ├── adminParadas.js                    # CRUD /api/admin/paradas
+        ├── adminReservas.js                    # GET /api/admin/reservas, marcar-pagado
+        └── adminEstadisticas.js                  # GET /api/admin/estadisticas
 ```
 
 ## Notas técnicas
 
 - **Base de datos**: MySQL, base `boletos_combi`, usuario dedicado
-  `combi_app` (nunca se usa `root` desde la app). Esquema completo en
-  `backend/db/schema.sql`.
+  `combi_app` (nunca se usa `root` desde la app). Esquema base en
+  `backend/db/schema.sql`, migraciones posteriores en archivos aparte
+  dentro de `backend/db/`.
 - **Protección contra doble-apartado**: la tabla `reserva_asientos` tiene
   una restricción `UNIQUE (fecha, horario_id, numero_asiento)`. Combinada
   con una transacción en `POST /api/reservas`, la base de datos garantiza
   que dos personas nunca puedan quedarse con el mismo asiento, incluso si
   lo intentan en el mismo instante.
-- **Variables de entorno**: las credenciales de MySQL viven en
-  `backend/.env`, que nunca se sube a Git (ver `backend/.gitignore`).
-  `backend/.env.example` es la plantilla sin datos reales.
+- **Borrado suave de horarios**: "borrar" un horario en realidad solo lo
+  marca `activo = FALSE` — nunca se borra físicamente, para no romper la
+  relación con reservas históricas. La restricción de hora única aplica
+  también a horarios inactivos (si quieres "revivir" uno, se reactiva,
+  no se vuelve a crear).
+- **Origen real del pago**: la columna `pagado_en_linea` se define una
+  sola vez al crear la reserva y nunca cambia — así, cuando el admin
+  marca un "apartado" como pagado (efectivo), sigue siendo distinguible
+  de alguien que pagó en línea desde el inicio, para las estadísticas.
+- **Autenticación del panel de admin**: contraseña única guardada como
+  hash (`bcrypt`) en `.env`, nunca en texto plano ni en el código. Las
+  rutas `/api/admin/*` (excepto `/login`) están protegidas por el
+  middleware `verificarAdmin`, que exige un token JWT válido en el
+  encabezado `Authorization: Bearer ...`. El token vive en
+  `sessionStorage` del navegador (no en `localStorage`), para que no
+  persista más allá de la sesión.
+- **Variables de entorno**: viven en `backend/.env`, que nunca se sube a
+  Git (ver `backend/.gitignore`). `backend/.env.example` es la plantilla
+  sin datos reales. Incluye credenciales de MySQL, `ADMIN_PASSWORD_HASH`
+  y `JWT_SECRET`.
 - **CORS**: el backend acepta peticiones desde cualquier origen por ahora
   (desarrollo local). Antes de producción hay que restringirlo solo al
   dominio real del frontend.

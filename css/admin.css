@@ -1,0 +1,61 @@
+/* Estilos exclusivos del panel de admin, además de los que ya
+   comparte con css/styles.css (colores, tipografía, botones). */
+
+.tabs-admin {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: var(--espacio-l);
+  overflow-x: auto;
+}
+
+.tab-admin {
+  background: var(--color-superficie);
+  border: 2px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  color: var(--color-tinta);
+  white-space: nowrap;
+}
+
+.tab-admin.activa {
+  background: var(--color-primario);
+  border-color: var(--color-primario);
+  color: white;
+}
+
+.seccion-admin {
+  display: none;
+}
+
+.seccion-admin.activa {
+  display: block;
+}
+
+.tabla-admin {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--espacio-m);
+  font-size: 0.9rem;
+}
+
+.tabla-admin th,
+.tabla-admin td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.boton-chico {
+  background: var(--color-primario);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.boton-chico--peligro {
+  background: var(--color-confirmado);
+}

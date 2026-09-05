@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de administración | Tepic → Batanga</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Karla:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css?v=1" />
+    <link rel="stylesheet" href="css/admin.css?v=1" />
+  </head>
+  <body>
+    <header class="encabezado">
+      <p class="encabezado__transportista">Panel de administración</p>
+      <h1 class="encabezado__ruta">
+        Tepic <span class="encabezado__flecha">→</span> Batanga
+      </h1>
+    </header>
+
+    <main class="contenedor">
+      <!-- PANTALLA: Login -->
+      <section id="pantalla-login" class="pantalla activa">
+        <h2>Iniciar sesión</h2>
+        <form id="formulario-login" novalidate>
+          <div class="campo">
+            <label for="contraseña-admin">Contraseña</label>
+            <input
+              type="password"
+              id="contraseña-admin"
+              autocomplete="current-password"
+            />
+            <p class="campo-error" id="error-login"></p>
+          </div>
+          <button type="submit" class="boton-primario">Entrar</button>
+        </form>
+      </section>
+
+      <!-- PANTALLA: Panel principal (una vez autenticado) -->
+      <section id="pantalla-panel" class="pantalla">
+        <nav class="tabs-admin">
+          <button
+            type="button"
+            class="tab-admin activa"
+            data-tab="configuracion"
+          >
+            Configuración
+          </button>
+          <button type="button" class="tab-admin" data-tab="horarios">
+            Horarios
+          </button>
+          <button type="button" class="tab-admin" data-tab="paradas">
+            Paradas
+          </button>
+          <button type="button" class="tab-admin" data-tab="reservas">
+            Reservas del día
+          </button>
+          <button type="button" class="tab-admin" data-tab="estadisticas">
+            Estadísticas
+          </button>
+        </nav>
+
+        <!-- Sección: Configuración -->
+        <div id="seccion-configuracion" class="seccion-admin activa">
+          <h2>Configuración general</h2>
+          <form id="formulario-configuracion" novalidate>
+            <div class="campo">
+              <label for="precio-ruta">Precio de ruta completa</label>
+              <input type="number" id="precio-ruta" min="0" step="1" />
+            </div>
+            <div class="campo">
+              <label for="capacidad-vehiculo"
+                >Capacidad del vehículo (asientos)</label
+              >
+              <input type="number" id="capacidad-vehiculo" min="1" step="1" />
+            </div>
+            <div class="campo">
+              <label for="minutos-limite">Minutos límite para apartado</label>
+              <input type="number" id="minutos-limite" min="0" step="1" />
+            </div>
+            <p
+              id="mensaje-configuracion"
+              class="texto-ayuda"
+              aria-live="polite"
+            ></p>
+            <button type="submit" class="boton-primario">
+              Guardar cambios
+            </button>
+          </form>
+        </div>
+
+        <!-- Sección: Horarios -->
+        <div id="seccion-horarios" class="seccion-admin">
+          <h2>Horarios de salida</h2>
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>¿Aplica domingo?</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-horarios"></tbody>
+          </table>
+
+          <form id="formulario-horario" novalidate>
+            <input type="hidden" id="horario-id-editando" />
+            <div class="campo">
+              <label for="horario-hora">Hora (HH:MM)</label>
+              <input type="time" id="horario-hora" required />
+            </div>
+            <div class="campo">
+              <label
+                ><input type="checkbox" id="horario-domingo" checked /> Aplica
+                los domingos</label
+              >
+            </div>
+            <p id="mensaje-horarios" class="texto-ayuda" aria-live="polite"></p>
+            <button
+              type="submit"
+              class="boton-primario"
+              id="boton-guardar-horario"
+            >
+              Agregar horario
+            </button>
+            <button
+              type="button"
+              class="boton-secundario"
+              id="boton-cancelar-horario"
+              hidden
+            >
+              Cancelar edición
+            </button>
+          </form>
+        </div>
+
+        <!-- Sección: Paradas -->
+        <div id="seccion-paradas" class="seccion-admin">
+          <h2>Paradas intermedias</h2>
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Nombre</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-paradas"></tbody>
+          </table>
+
+          <form id="formulario-parada" novalidate>
+            <input type="hidden" id="parada-id-editando" />
+            <div class="campo">
+              <label for="parada-orden">Orden</label>
+              <input type="number" id="parada-orden" min="1" required />
+            </div>
+            <div class="campo">
+              <label for="parada-nombre">Nombre</label>
+              <input type="text" id="parada-nombre" required />
+            </div>
+            <p id="mensaje-paradas" class="texto-ayuda" aria-live="polite"></p>
+            <button
+              type="submit"
+              class="boton-primario"
+              id="boton-guardar-parada"
+            >
+              Agregar parada
+            </button>
+            <button
+              type="button"
+              class="boton-secundario"
+              id="boton-cancelar-parada"
+              hidden
+            >
+              Cancelar edición
+            </button>
+          </form>
+        </div>
+
+        <!-- Sección: Reservas del día -->
+        <div id="seccion-reservas" class="seccion-admin">
+          <h2>Reservas del día</h2>
+          <div class="campo">
+            <label for="fecha-reservas">Fecha</label>
+            <input type="date" id="fecha-reservas" />
+          </div>
+          <button
+            type="button"
+            id="boton-buscar-reservas"
+            class="boton-secundario"
+          >
+            Buscar
+          </button>
+
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Asiento</th>
+                <th>Pasajero</th>
+                <th>Teléfono</th>
+                <th>Modalidad</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-reservas"></tbody>
+          </table>
+        </div>
+        <!-- Sección: Estadísticas -->
+        <div id="seccion-estadisticas" class="seccion-admin">
+          <h2>Estadísticas de boletos</h2>
+          <div class="campo">
+            <label for="estadisticas-fecha-inicio">Desde</label>
+            <input type="date" id="estadisticas-fecha-inicio" />
+          </div>
+          <div class="campo">
+            <label for="estadisticas-fecha-fin">Hasta</label>
+            <input type="date" id="estadisticas-fecha-fin" />
+          </div>
+          <button
+            type="button"
+            id="boton-buscar-estadisticas"
+            class="boton-secundario"
+          >
+            Consultar
+          </button>
+
+          <table class="tabla-admin">
+            <tbody id="tabla-estadisticas"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="js/admin.js?v=1"></script>
+  </body>
+</html>
