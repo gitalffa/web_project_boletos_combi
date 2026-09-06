@@ -45,7 +45,9 @@ routerAdminReservas.get("/", async (peticion, respuesta) => {
 routerAdminReservas.put("/:id/marcar-pagado", async (peticion, respuesta) => {
   try {
     const [resultado] = await pool.query(
-      `UPDATE reservas SET modalidad = 'confirmado', vence_en = NULL
+      `UPDATE reservas
+       SET modalidad = 'confirmado', vence_en = NULL,
+           marcado_pagado_por = 'admin', marcado_pagado_operador_id = NULL, marcado_pagado_en = NOW()
        WHERE id = ? AND modalidad = 'apartado'`,
       [peticion.params.id],
     );

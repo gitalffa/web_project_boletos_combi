@@ -23,6 +23,12 @@ import {
   marcarComoPagado,
   reactivarHorario,
   obtenerEstadisticas,
+  obtenerOperadores,
+  crearOperador,
+  actualizarOperador,
+  resetearContrasenaOperador,
+  desactivarOperador,
+  reactivarOperador,
 } from "./adminService.js?v=1";
 
 function iniciar() {
@@ -31,6 +37,8 @@ function iniciar() {
     cargarConfiguracion();
     cargarHorarios();
     cargarParadas();
+    llenarCheckboxesHorarios();
+    cargarOperadores();
   }
 
   configurarLogin();
@@ -40,6 +48,7 @@ function iniciar() {
   configurarFormularioParada();
   configurarReservas();
   configurarEstadisticas();
+  configurarFormularioOperador();
 }
 
 function configurarLogin() {
@@ -394,5 +403,150 @@ async function cargarEstadisticas(fechaInicio, fechaFin) {
     <tr><td>Pagados en efectivo (marcados por admin)</td><td>${est.pagadosEfectivo}</td></tr>
     <tr><td><strong>Total de boletos</strong></td><td><strong>${totalBoletos}</strong></td></tr>
   `;
+}
+
+// ---------- Operadores ----------
+
+async function llenarCheckboxesHorarios(horarioIdsSeleccionados = []) {
+  const horarios = await obtenerHorariosAdmin();
+  const contenedor = document.getElementById("operador-horarios-checkboxes");
+
+  contenedor.innerHTML = horarios
+    .filter((h) => h.activo)
+    .map((h) => {
+      const marcado = horarioIdsSeleccionados.includes(h.id) ? "checked" : "";
+      return `
+        <label style="display:block;">
+          <input type="checkbox" value="${h.id}" class="checkbox-horario-operador" ${marcado}>
+          ${h.hora.slice(0, 5)}
+        </label>
+      `;
+    })
+    .join("");
+}
+
+function obtenerHorarioIdsSeleccionados() {
+  const marcados = document.querySelectorAll(".checkbox-horario-operador:checked");
+  return Array.from(marcados).map((casilla) => Number(casilla.value));
+}
+
+async function cargarOperadores() {
+  const operadores = await obtenerOperadores();
+  const cuerpoTabla = document.getElementById("tabla-operadores");
+  cuerpoTabla.innerHTML = "";
+
+  for (const operador of operadores) {
+    const fila = document.createElement("tr");
+    const botonEstado = operador.activo
+      ? `<button type="button" class="boton-chico boton-chico--peligro" data-desactivar="${operador.id}">Desactivar</button>`
+      : `<button type="button" class="boton-chico" data-reactivar="${operador.id}">Reactivar</button>`;
+
+    const horasTexto = operador.horarios.length
+      ? operador.horarios.map((h) => h.hora.slice(0, 5)).join(", ")
+      : "(sin horarios asignados)";
+
+    fila.innerHTML = `
+      <td>${operador.nombre}</td>
+      <td>${operador.usuario}</td>
+      <td>${horasTexto}</td>
+      <td>${operador.activo ? "Activo" : "Inactivo"}</td>
+      <td>
+        <button type="button" class="boton-chico" data-editar="${operador.id}">Editar</button>
+        <button type="button" class="boton-chico" data-resetear="${operador.id}">Nueva contraseña</button>
+        ${botonEstado}
+      </td>
+    `;
+    cuerpoTabla.appendChild(fila);
+
+    fila.querySelector("[data-editar]").addEventListener("click", async () => {
+      document.getElementById("operador-id-editando").value = operador.id;
+      document.getElementById("operador-nombre").value = operador.nombre;
+      document.getElementById("operador-usuario").value = operador.usuario;
+      document.getElementById("operador-usuario").disabled = true; // el usuario no se cambia al editar
+      document.getElementById("campo-operador-contrasena").hidden = true; // se cambia aparte, con "Nueva contraseña"
+      await llenarCheckboxesHorarios(operador.horarios.map((h) => h.id));
+      document.getElementById("boton-guardar-operador").textContent =
+        "Actualizar operador";
+      document.getElementById("boton-cancelar-operador").hidden = false;
+    });
+
+    fila
+      .querySelector("[data-resetear]")
+      .addEventListener("click", async () => {
+        const nueva = prompt(`Nueva contraseña para ${operador.nombre}:`);
+        if (!nueva) return;
+        await resetearContrasenaOperador(operador.id, nueva);
+        alert("Contraseña actualizada.");
+      });
+
+    const botonDesactivar = fila.querySelector("[data-desactivar]");
+    if (botonDesactivar) {
+      botonDesactivar.addEventListener("click", async () => {
+        await desactivarOperador(operador.id);
+        cargarOperadores();
+      });
+    }
+
+    const botonReactivar = fila.querySelector("[data-reactivar]");
+    if (botonReactivar) {
+      botonReactivar.addEventListener("click", async () => {
+        await reactivarOperador(operador.id);
+        cargarOperadores();
+      });
+    }
+  }
+}
+
+async function limpiarFormularioOperador() {
+  document.getElementById("formulario-operador").reset();
+  document.getElementById("operador-id-editando").value = "";
+  document.getElementById("operador-usuario").disabled = false;
+  document.getElementById("campo-operador-contrasena").hidden = false;
+  await llenarCheckboxesHorarios([]);
+  document.getElementById("boton-guardar-operador").textContent =
+    "Agregar operador";
+  document.getElementById("boton-cancelar-operador").hidden = true;
+  document.getElementById("mensaje-operadores").textContent = "";
+}
+
+function configurarFormularioOperador() {
+  document
+    .getElementById("boton-cancelar-operador")
+    .addEventListener("click", limpiarFormularioOperador);
+
+  document
+    .getElementById("formulario-operador")
+    .addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const mensaje = document.getElementById("mensaje-operadores");
+      mensaje.textContent = "";
+      const idEditando = document.getElementById("operador-id-editando").value;
+      const horarioIds = obtenerHorarioIdsSeleccionados();
+
+      if (horarioIds.length === 0) {
+        mensaje.textContent = "Selecciona al menos un horario.";
+        return;
+      }
+
+      try {
+        if (idEditando) {
+          await actualizarOperador(idEditando, {
+            nombre: document.getElementById("operador-nombre").value.trim(),
+            horarioIds,
+          });
+        } else {
+          await crearOperador({
+            nombre: document.getElementById("operador-nombre").value.trim(),
+            usuario: document.getElementById("operador-usuario").value.trim(),
+            contrasena: document.getElementById("operador-contrasena").value,
+            horarioIds,
+          });
+        }
+        await limpiarFormularioOperador();
+        cargarOperadores();
+      } catch (error) {
+        mensaje.textContent = error.message;
+      }
+    });
 }
 iniciar();

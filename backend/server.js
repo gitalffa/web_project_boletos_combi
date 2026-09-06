@@ -23,6 +23,10 @@ import { routerAdminHorarios } from "./routes/adminHorarios.js";
 import { routerAdminParadas } from "./routes/adminParadas.js";
 import { routerAdminReservas } from "./routes/adminReservas.js";
 import { routerAdminEstadisticas } from "./routes/adminEstadisticas.js";
+import { routerAdminOperadores } from "./routes/adminOperadores.js";
+import { routerOperadorLogin } from "./routes/operadorLogin.js";
+import { verificarOperador } from "./middleware/verificarOperador.js";
+import { routerOperadorReservas } from "./routes/operadorReservas.js";
 
 dotenv.config();
 
@@ -43,6 +47,9 @@ app.use("/api/admin/horarios", verificarAdmin, routerAdminHorarios);
 app.use("/api/admin/paradas", verificarAdmin, routerAdminParadas);
 app.use("/api/admin/reservas", verificarAdmin, routerAdminReservas);
 app.use("/api/admin/estadisticas", verificarAdmin, routerAdminEstadisticas);
+app.use("/api/admin/operadores", verificarAdmin, routerAdminOperadores);
+app.use("/api/operador/login", routerOperadorLogin);
+app.use("/api/operador/reservas", verificarOperador, routerOperadorReservas);
 
 /**
  * Ruta de prueba simple: solo confirma que el servidor está vivo.

@@ -185,3 +185,65 @@ export async function obtenerEstadisticas(fechaInicio, fechaFin) {
   const datos = await manejarRespuesta(respuesta);
   return datos.estadisticas;
 }
+
+// ---------- Operadores ----------
+
+export async function obtenerOperadores() {
+  const respuesta = await fetch(`${URL_BASE_API}/admin/operadores`, {
+    headers: encabezadosConToken(),
+  });
+  const datos = await manejarRespuesta(respuesta);
+  return datos.operadores;
+}
+
+export async function crearOperador(datosOperador) {
+  const respuesta = await fetch(`${URL_BASE_API}/admin/operadores`, {
+    method: "POST",
+    headers: encabezadosConToken(),
+    body: JSON.stringify(datosOperador),
+  });
+  return manejarRespuesta(respuesta);
+}
+
+export async function actualizarOperador(id, datosOperador) {
+  const respuesta = await fetch(`${URL_BASE_API}/admin/operadores/${id}`, {
+    method: "PUT",
+    headers: encabezadosConToken(),
+    body: JSON.stringify(datosOperador),
+  });
+  return manejarRespuesta(respuesta);
+}
+
+export async function resetearContrasenaOperador(id, contrasenaNueva) {
+  const respuesta = await fetch(
+    `${URL_BASE_API}/admin/operadores/${id}/resetear-contrasena`,
+    {
+      method: "PUT",
+      headers: encabezadosConToken(),
+      body: JSON.stringify({ contrasenaNueva }),
+    },
+  );
+  return manejarRespuesta(respuesta);
+}
+
+export async function desactivarOperador(id) {
+  const respuesta = await fetch(
+    `${URL_BASE_API}/admin/operadores/${id}/desactivar`,
+    {
+      method: "PUT",
+      headers: encabezadosConToken(),
+    },
+  );
+  return manejarRespuesta(respuesta);
+}
+
+export async function reactivarOperador(id) {
+  const respuesta = await fetch(
+    `${URL_BASE_API}/admin/operadores/${id}/reactivar`,
+    {
+      method: "PUT",
+      headers: encabezadosConToken(),
+    },
+  );
+  return manejarRespuesta(respuesta);
+}
