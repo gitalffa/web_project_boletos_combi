@@ -42,6 +42,7 @@ function iniciar() {
   }
 
   configurarLogin();
+  configurarCerrarSesion();
   configurarTabs();
   configurarFormularioConfiguracion();
   configurarFormularioHorario();
@@ -49,6 +50,10 @@ function iniciar() {
   configurarReservas();
   configurarEstadisticas();
   configurarFormularioOperador();
+  configurarLogin();
+  configurarCerrarSesion();
+  configurarMenuHamburguesa();
+  configurarTabs();
 }
 
 function configurarLogin() {
@@ -85,6 +90,31 @@ function mostrarPantalla(nombre) {
     .classList.toggle("activa", nombre === "panel");
 }
 
+function configurarCerrarSesion() {
+  document
+    .getElementById("boton-cerrar-sesion-admin")
+    .addEventListener("click", () => {
+      cerrarSesion();
+      mostrarPantalla("login");
+    });
+}
+function configurarMenuHamburguesa() {
+  const boton = document.getElementById("boton-menu-hamburguesa");
+  const menu = document.getElementById("menu-panel-admin");
+
+  boton.addEventListener("click", () => {
+    const abierto = menu.classList.toggle("abierto");
+    boton.setAttribute("aria-expanded", String(abierto));
+  });
+}
+
+function cerrarMenuHamburguesa() {
+  document.getElementById("menu-panel-admin").classList.remove("abierto");
+  document
+    .getElementById("boton-menu-hamburguesa")
+    .setAttribute("aria-expanded", "false");
+}
+
 function configurarTabs() {
   const tabs = document.querySelectorAll(".tab-admin");
   for (const tab of tabs) {
@@ -108,6 +138,7 @@ function configurarTabs() {
       for (const mensaje of mensajes) {
         mensaje.textContent = "";
       }
+      cerrarMenuHamburguesa();
     });
   }
 }
@@ -426,7 +457,9 @@ async function llenarCheckboxesHorarios(horarioIdsSeleccionados = []) {
 }
 
 function obtenerHorarioIdsSeleccionados() {
-  const marcados = document.querySelectorAll(".checkbox-horario-operador:checked");
+  const marcados = document.querySelectorAll(
+    ".checkbox-horario-operador:checked",
+  );
   return Array.from(marcados).map((casilla) => Number(casilla.value));
 }
 
@@ -452,7 +485,7 @@ async function cargarOperadores() {
       <td>${operador.activo ? "Activo" : "Inactivo"}</td>
       <td>
         <button type="button" class="boton-chico" data-editar="${operador.id}">Editar</button>
-        <button type="button" class="boton-chico" data-resetear="${operador.id}">Nueva contraseña</button>
+        <button type="button" class="boton-chico" data-resetear="${operador.id}">Generar contraseña temporal</button>
         ${botonEstado}
       </td>
     `;
@@ -473,10 +506,14 @@ async function cargarOperadores() {
     fila
       .querySelector("[data-resetear]")
       .addEventListener("click", async () => {
-        const nueva = prompt(`Nueva contraseña para ${operador.nombre}:`);
+        const nueva = prompt(
+          `Escribe una contraseña TEMPORAL para ${operador.nombre}. Él/ella tendrá que cambiarla por una propia en cuanto inicie sesión:`,
+        );
         if (!nueva) return;
         await resetearContrasenaOperador(operador.id, nueva);
-        alert("Contraseña actualizada.");
+        alert(
+          "Contraseña temporal generada. Compártesela al operador para que la cambie al entrar.",
+        );
       });
 
     const botonDesactivar = fila.querySelector("[data-desactivar]");

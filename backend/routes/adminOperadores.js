@@ -149,11 +149,13 @@ routerAdminOperadores.put("/:id/resetear-contrasena", async (peticion, respuesta
 
   try {
     const hash = await bcrypt.hash(contrasenaNueva, 12);
-    await pool.query("UPDATE operadores SET contrasena_hash = ? WHERE id = ?", [
-      hash,
-      peticion.params.id,
-    ]);
-    respuesta.json({ estado: "ok", mensaje: "Contraseña actualizada" });
+    // Se marca como temporal: el operador va a tener que cambiarla
+    // por una propia en cuanto inicie sesión con ella.
+    await pool.query(
+      "UPDATE operadores SET contrasena_hash = ?, debe_cambiar_contrasena = TRUE WHERE id = ?",
+      [hash, peticion.params.id]
+    );
+    respuesta.json({ estado: "ok", mensaje: "Contraseña temporal generada" });
   } catch (error) {
     console.error("Error al resetear contraseña:", error);
     respuesta.status(500).json({ estado: "error", mensaje: "No se pudo actualizar la contraseña" });

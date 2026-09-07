@@ -110,3 +110,10 @@ export async function crearReserva(datosReserva) {
 
   return manejarRespuesta(respuesta);
 }
+
+export async function consultarReserva(folio, telefono) {
+  const respuesta = await fetch(
+    `${URL_BASE_API}/reservas/consultar?folio=${encodeURIComponent(folio)}&telefono=${encodeURIComponent(telefono)}`,
+  );
+  return manejarRespuesta(respuesta);
+}

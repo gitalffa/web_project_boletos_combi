@@ -37,6 +37,43 @@
         <div id="lista-horarios" class="lista-horarios">
           <!-- JS inserta aquí los botones de horario disponibles -->
         </div>
+        <button type="button" id="boton-ir-a-consultar" class="enlace-texto">
+          ¿Ya tienes un boleto? Consúltalo aquí
+        </button>
+      </section>
+      <!-- PANTALLA: Consultar un boleto ya hecho -->
+      <section id="pantalla-consulta" class="pantalla" data-pantalla="consulta">
+        <button type="button" class="boton-volver" data-volver="inicio">
+          ← Regresar
+        </button>
+
+        <h2>Consulta tu boleto</h2>
+        <p class="texto-ayuda">
+          Escribe tu folio y los últimos 4 dígitos del teléfono que registraste.
+        </p>
+
+        <form id="formulario-consulta" novalidate>
+          <div class="campo">
+            <label for="folio-consulta">Folio</label>
+            <input type="text" id="folio-consulta" placeholder="TB-XXXXX" />
+          </div>
+          <div class="campo">
+            <label for="telefono-consulta"
+              >Últimos 4 dígitos del teléfono</label
+            >
+            <input
+              type="text"
+              id="telefono-consulta"
+              inputmode="numeric"
+              maxlength="4"
+              placeholder="1234"
+            />
+          </div>
+          <p id="mensaje-consulta" class="campo-error"></p>
+          <button type="submit" class="boton-primario">Buscar mi boleto</button>
+        </form>
+
+        <div id="resultado-consulta"></div>
       </section>
 
       <!-- PANTALLA 2: Selección de asientos -->
@@ -155,6 +192,13 @@
         <div id="comprobante" class="comprobante">
           <!-- JS inserta aquí el folio, horario, asientos, pasajeros -->
         </div>
+        <button
+          type="button"
+          id="boton-descargar-comprobante"
+          class="boton-secundario"
+        >
+          Descargar / Imprimir mi boleto
+        </button>
 
         <button type="button" id="boton-nueva-compra" class="boton-secundario">
           Reservar otro boleto

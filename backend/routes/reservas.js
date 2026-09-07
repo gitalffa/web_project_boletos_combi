@@ -123,3 +123,80 @@ routerReservas.post("/", async (peticion, respuesta) => {
     conexion.release();
   }
 });
+/**
+ * GET /api/reservas/consultar?folio=TB-XXXXX&telefono=1234
+ *
+ * Pública, pero exige folio + los últimos 4 dígitos del teléfono de
+ * algún pasajero de esa reserva — así, aunque alguien "adivine" un
+ * folio, no puede ver los datos sin también conocer el teléfono.
+ */
+routerReservas.get("/consultar", async (peticion, respuesta) => {
+  const { folio, telefono } = peticion.query;
+
+  if (!folio || !telefono) {
+    return respuesta
+      .status(400)
+      .json({ estado: "error", mensaje: "Faltan folio y teléfono" });
+  }
+
+  const folioNormalizado = folio.trim().toUpperCase();
+
+  try {
+    const [[reserva]] = await pool.query(
+      `SELECT r.folio, r.fecha, r.modalidad, r.vence_en, h.hora
+       FROM reservas r
+       JOIN horarios h ON h.id = r.horario_id
+       WHERE r.folio = ?`,
+      [folioNormalizado],
+    );
+
+    if (!reserva) {
+      return respuesta
+        .status(404)
+        .json({ estado: "error", mensaje: "No encontramos ese boleto" });
+    }
+
+    const [pasajeros] = await pool.query(
+      `SELECT numero_asiento, nombre_pasajero, telefono_pasajero
+       FROM reserva_asientos
+       WHERE reserva_id = (SELECT id FROM reservas WHERE folio = ?)`,
+      [folioNormalizado],
+    );
+
+    const coincideTelefono = pasajeros.some((p) =>
+      p.telefono_pasajero.endsWith(telefono.trim()),
+    );
+
+    if (!coincideTelefono) {
+      // Mismo mensaje que "no encontrado": no revelamos si el folio
+      // existía pero el teléfono no coincidía con ninguno.
+      return respuesta
+        .status(404)
+        .json({ estado: "error", mensaje: "No encontramos ese boleto" });
+    }
+
+    const fecha =
+      reserva.fecha instanceof Date
+        ? reserva.fecha.toISOString().slice(0, 10)
+        : reserva.fecha;
+
+    respuesta.json({
+      estado: "ok",
+      folio: reserva.folio,
+      fecha,
+      horario: reserva.hora.slice(0, 5),
+      modalidad: reserva.modalidad,
+      vencePara: reserva.vence_en,
+      pasajeros: pasajeros.map((p) => ({
+        numeroAsiento: p.numero_asiento,
+        nombre: p.nombre_pasajero,
+        contacto: p.telefono_pasajero,
+      })),
+    });
+  } catch (error) {
+    console.error("Error al consultar boleto:", error);
+    respuesta
+      .status(500)
+      .json({ estado: "error", mensaje: "No se pudo consultar el boleto" });
+  }
+});

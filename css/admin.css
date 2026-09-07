@@ -59,3 +59,61 @@
 .boton-chico--peligro {
   background: var(--color-confirmado);
 }
+
+/* =============================================================
+   MENÚ HAMBURGUESA (admin.html y operador.html)
+   ============================================================= */
+.boton-hamburguesa {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 40px;
+  background: var(--color-superficie);
+  border: 2px solid var(--color-borde);
+  border-radius: 8px;
+  margin-bottom: var(--espacio-m);
+}
+
+.boton-hamburguesa span {
+  display: block;
+  height: 2px;
+  margin: 0 9px;
+  background: var(--color-primario);
+}
+
+.menu-panel {
+  display: none;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--color-superficie);
+  border: 2px solid var(--color-borde);
+  border-radius: 12px;
+  padding: var(--espacio-m);
+  margin-bottom: var(--espacio-l);
+}
+
+.menu-panel.abierto {
+  display: flex;
+}
+
+.menu-panel .tab-admin {
+  width: 100%;
+  text-align: left;
+}
+
+.menu-panel__separador {
+  border: none;
+  border-top: 1px solid var(--color-borde);
+  margin: 0.3rem 0;
+}
+
+.menu-panel__cerrar-sesion {
+  background: none;
+  border: none;
+  color: var(--color-confirmado);
+  font-weight: 700;
+  text-align: left;
+  padding: 0.4rem 0;
+}

@@ -13,27 +13,24 @@ a producción.
 
 ## Estado del proyecto
 
-✅ MVP funcional de principio a fin, con backend real y panel de
-administración — en fase de pruebas.
+✅ MVP funcional de principio a fin, con backend real, panel de
+administración y panel de operadores (choferes) — en fase de pruebas.
 
 ## Arquitectura
 
 ```
-Frontend (cliente)     →  fetch  →  API Express  →  MySQL
-      js/                          backend/
-Frontend (admin)       →  fetch (con token JWT)  ↗
-      admin.html + js/adminService.js
+App del cliente (index.html)     →  fetch                 →  API Express  →  MySQL
+App de admin (admin.html)        →  fetch (token JWT admin)     ↗   backend/
+App de operador (operador.html)  →  fetch (token JWT operador)  ↗
 ```
 
-El frontend del cliente ya NO usa `localStorage` ni el JSON estático
-para datos de reservas — todo el inventario de asientos vive en una
-base de datos MySQL compartida por todos los usuarios, con una
-restricción `UNIQUE` que evita que dos personas reserven el mismo
-asiento al mismo tiempo (ver `backend/db/schema.sql`).
+Todo el inventario de asientos y reservas vive en una base de datos MySQL
+compartida, con una restricción `UNIQUE` que evita que dos personas
+reserven el mismo asiento al mismo tiempo (ver `backend/db/schema.sql`).
 
 ## Funcionalidades del MVP
 
-**App del cliente**
+**App del cliente** (`index.html`)
 - [x] Ver horarios de salida del día (con regla especial para domingo),
       calculados en el backend
 - [x] Ocultar automáticamente los horarios que ya salieron hoy
@@ -46,6 +43,8 @@ asiento al mismo tiempo (ver `backend/db/schema.sql`).
 - [x] Vencimiento automático de los apartados (30 min antes de la salida)
 - [x] Revalidación de asientos si otro usuario se adelantó (error 409)
 - [x] Comprobante con folio al terminar la compra
+- [x] Descargar/imprimir el boleto (usando el diálogo nativo del navegador)
+- [x] Consultar un boleto ya hecho por folio + últimos 4 dígitos del teléfono
 
 **Backend**
 - [x] Node/Express + MySQL, con protección contra doble-apartado a nivel
@@ -54,6 +53,7 @@ asiento al mismo tiempo (ver `backend/db/schema.sql`).
 
 **Panel de administración** (`admin.html`)
 - [x] Login con contraseña (hash con `bcrypt`) + sesión con token JWT
+- [x] Menú de hamburguesa con las secciones y botón de cerrar sesión
 - [x] Editar precio, capacidad del vehículo y minutos de expiración
 - [x] Administrar horarios: crear, editar, desactivar/reactivar
       (borrado suave — nunca se borra un horario con reservas históricas)
@@ -64,6 +64,30 @@ asiento al mismo tiempo (ver `backend/db/schema.sql`).
 - [x] Estadísticas por rango de fechas: apartados vigentes/vencidos,
       pagados en línea, pagados en efectivo (distinguiendo el origen
       real del pago aunque el admin lo marque después)
+- [x] Administrar operadores (choferes): crear cuenta, asignarle uno o
+      varios horarios, desactivar/reactivar, generar contraseña temporal
+      de emergencia
+
+**Panel de operador / chofer** (`operador.html`)
+- [x] Login independiente, con su propio usuario y contraseña
+- [x] Ve únicamente los pasajeros de su/sus propio(s) horario(s) del día
+      de hoy — nunca los de otros choferes ni otros horarios (lo decide
+      el token, no algo que el operador pueda elegir)
+- [x] Si tiene varias salidas asignadas el mismo día, cada una se
+      muestra agrupada por separado
+- [x] Marcar un pasajero como pagado (efectivo al abordar)
+- [x] Cambiar su propia contraseña — el admin ya NO puede fijarle una
+      contraseña de uso diario, solo generar una temporal de emergencia
+      que el operador está obligado a cambiar en su primer ingreso
+- [x] Menú de hamburguesa con "Cambiar mi contraseña" y "Cerrar sesión"
+
+**Seguridad y auditoría**
+- [x] Cada pago marcado como recibido queda registrado con quién lo
+      marcó (admin, o qué operador específico) y a qué hora — protege
+      tanto al negocio como a cada chofer ante cualquier disputa
+- [x] Un operador nunca puede marcar como pagada una reserva que no sea
+      de su propio horario y del día de hoy (lo garantiza la consulta a
+      la base de datos, no una simple validación del lado del cliente)
 
 ## Pendiente / mejoras futuras
 
@@ -95,9 +119,10 @@ Debe quedar corriendo en `http://localhost:3000`.
 
 **2. Frontend**
 Con la extensión **Live Server** de VS Code: clic derecho sobre
-`index.html` (app del cliente) o `admin.html` (panel de administración)
-→ "Open with Live Server". Debe abrir en un puerto distinto (normalmente
-`5500`) — es normal y necesario que sean puertos diferentes al del backend.
+`index.html` (cliente), `admin.html` (administración) u `operador.html`
+(chofer) → "Open with Live Server". Debe abrir en un puerto distinto
+(normalmente `5500`) — es normal y necesario que sean puertos diferentes
+al del backend.
 
 **Base de datos**: antes de la primera vez, corre el esquema y las
 migraciones, en este orden:
@@ -107,6 +132,10 @@ mysql -u combi_app -p boletos_combi < backend/db/seed_paradas.sql
 mysql -u combi_app -p boletos_combi < backend/db/agregar_columna_activo.sql
 mysql -u combi_app -p boletos_combi < backend/db/agregar_restriccion_hora_unica.sql
 mysql -u combi_app -p boletos_combi < backend/db/agregar_columna_pagado_en_linea.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_tabla_operadores.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_auditoria_pago.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_operador_horarios.sql
+mysql -u combi_app -p boletos_combi < backend/db/agregar_forzar_cambio_contrasena.sql
 ```
 
 **Credenciales del admin**: genera tu contraseña y el secreto de sesión
@@ -116,27 +145,34 @@ node backend/scripts/generar-hash-contrasena.js "TuContraseñaAquí"
 node backend/scripts/generar-secreto-jwt.js
 ```
 
+**Cuentas de operador**: se crean desde el panel de administración
+(pestaña "Operadores"), no con un script — ahí mismo se les asigna uno o
+varios horarios.
+
 ## Estructura del proyecto
 
 ```
 web_project_boletos_combi/
 ├── index.html                 # app del cliente
 ├── admin.html                  # panel de administración
+├── operador.html                # panel del chofer
 ├── README.md
 ├── .gitignore
 ├── css/
 │   ├── styles.css               # estilos compartidos
-│   └── admin.css                 # estilos exclusivos del panel de admin
+│   └── admin.css                 # estilos de admin y operador (pestañas, menú hamburguesa, tablas)
 ├── data/
 │   └── viajes.json        # OBSOLETO, ya no lo usa la app (ver Pendiente)
 ├── js/                      # ---------- FRONTEND ----------
 │   ├── dataService.js       # capa de acceso a datos del cliente (fetch a la API)
 │   ├── adminService.js       # capa de acceso a datos del panel de admin (fetch + token)
+│   ├── operadorService.js     # capa de acceso a datos del panel de operador (fetch + token)
 │   ├── booking.js              # OBSOLETO, la lógica ahora vive en el backend
 │   ├── seatMap.js                # mapa de asientos y selección
 │   ├── validation.js              # validación de formularios (pasajero y pago)
 │   ├── index.js                    # arranque de la app del cliente
-│   └── admin.js                     # arranque del panel de admin
+│   ├── admin.js                     # arranque del panel de admin
+│   └── operador.js                   # arranque del panel de operador
 └── backend/                  # ---------- BACKEND ----------
     ├── package.json
     ├── .env.example            # plantilla de variables de entorno (sin datos reales)
@@ -145,18 +181,23 @@ web_project_boletos_combi/
     │   ├── generar-hash-contrasena.js  # genera ADMIN_PASSWORD_HASH
     │   └── generar-secreto-jwt.js       # genera JWT_SECRET
     ├── middleware/
-    │   └── verificarAdmin.js       # protege las rutas /api/admin/*
+    │   ├── verificarAdmin.js       # protege las rutas /api/admin/*
+    │   └── verificarOperador.js     # protege las rutas /api/operador/* (y graba horarioIds/operadorId del token)
     ├── db/
-    │   ├── schema.sql                        # esquema base de la base de datos
-    │   ├── seed_paradas.sql                   # datos iniciales de paradas intermedias
-    │   ├── agregar_columna_activo.sql          # migración: borrado suave de horarios
-    │   ├── agregar_restriccion_hora_unica.sql   # migración: horarios sin duplicados
-    │   ├── agregar_columna_pagado_en_linea.sql   # migración: origen real del pago
-    │   └── connection.js                          # pool de conexiones a MySQL
+    │   ├── schema.sql                                # esquema base de la base de datos
+    │   ├── seed_paradas.sql                           # datos iniciales de paradas intermedias
+    │   ├── agregar_columna_activo.sql                  # migración: borrado suave de horarios
+    │   ├── agregar_restriccion_hora_unica.sql           # migración: horarios sin duplicados
+    │   ├── agregar_columna_pagado_en_linea.sql           # migración: origen real del pago
+    │   ├── agregar_tabla_operadores.sql                   # migración: cuentas de choferes
+    │   ├── agregar_auditoria_pago.sql                      # migración: quién marcó cada pago y cuándo
+    │   ├── agregar_operador_horarios.sql                    # migración: un operador puede tener varios horarios
+    │   ├── agregar_forzar_cambio_contrasena.sql              # migración: forzar cambio de contraseña temporal
+    │   └── connection.js                                      # pool de conexiones a MySQL
     └── routes/
         ├── horarios.js              # GET  /api/horarios              (cliente)
         ├── asientos.js               # GET  /api/asientos              (cliente)
-        ├── reservas.js                # POST /api/reservas (con transacción) (cliente)
+        ├── reservas.js                # POST /api/reservas (con transacción), GET /api/reservas/consultar (cliente)
         ├── configuracion.js            # GET  /api/configuracion        (cliente)
         ├── paradas.js                   # GET  /api/paradas             (cliente)
         ├── adminLogin.js                  # POST /api/admin/login
@@ -164,7 +205,11 @@ web_project_boletos_combi/
         ├── adminHorarios.js                 # CRUD /api/admin/horarios (con borrado suave)
         ├── adminParadas.js                    # CRUD /api/admin/paradas
         ├── adminReservas.js                    # GET /api/admin/reservas, marcar-pagado
-        └── adminEstadisticas.js                  # GET /api/admin/estadisticas
+        ├── adminEstadisticas.js                  # GET /api/admin/estadisticas
+        ├── adminOperadores.js                      # CRUD /api/admin/operadores (con varios horarios c/u)
+        ├── operadorLogin.js                          # POST /api/operador/login
+        ├── operadorReservas.js                         # GET /api/operador/reservas, marcar-pagado
+        └── operadorCuenta.js                             # PUT /api/operador/cambiar-contrasena
 ```
 
 ## Notas técnicas
@@ -184,16 +229,34 @@ web_project_boletos_combi/
   también a horarios inactivos (si quieres "revivir" uno, se reactiva,
   no se vuelve a crear).
 - **Origen real del pago**: la columna `pagado_en_linea` se define una
-  sola vez al crear la reserva y nunca cambia — así, cuando el admin
-  marca un "apartado" como pagado (efectivo), sigue siendo distinguible
-  de alguien que pagó en línea desde el inicio, para las estadísticas.
-- **Autenticación del panel de admin**: contraseña única guardada como
-  hash (`bcrypt`) en `.env`, nunca en texto plano ni en el código. Las
-  rutas `/api/admin/*` (excepto `/login`) están protegidas por el
-  middleware `verificarAdmin`, que exige un token JWT válido en el
-  encabezado `Authorization: Bearer ...`. El token vive en
+  sola vez al crear la reserva y nunca cambia — así, cuando el admin o
+  un operador marca un "apartado" como pagado (efectivo), sigue siendo
+  distinguible de alguien que pagó en línea desde el inicio.
+- **Auditoría de pagos**: las columnas `marcado_pagado_por`,
+  `marcado_pagado_operador_id` y `marcado_pagado_en` registran quién
+  marcó cada pago (admin, o qué operador específico) y cuándo — protege
+  tanto al negocio como a cada chofer ante cualquier disputa.
+- **Operadores con varios horarios**: relación muchos a muchos vía la
+  tabla `operador_horarios` (un operador puede tener asignada más de una
+  salida el mismo día). El token del operador lleva grabado el arreglo
+  de `horarioIds` asignados — el propio operador nunca elige ni envía
+  qué horario quiere ver, así que no hay forma de que vea información de
+  otro chofer.
+- **Contraseñas de operador**: el admin nunca vuelve a conocer la
+  contraseña real que un operador usa día a día. Cuando se crea una
+  cuenta o se genera una "contraseña temporal" de emergencia, la columna
+  `debe_cambiar_contrasena` obliga al operador a definir una propia en
+  su primer ingreso, antes de dejarlo ver nada más.
+- **Autenticación de admin y operador**: contraseñas guardadas como hash
+  (`bcrypt`), nunca en texto plano. Las rutas `/api/admin/*` y
+  `/api/operador/*` (excepto los `/login`) están protegidas por sus
+  respectivos middlewares, que exigen un token JWT válido en el
+  encabezado `Authorization: Bearer ...`. Los tokens viven en
   `sessionStorage` del navegador (no en `localStorage`), para que no
-  persista más allá de la sesión.
+  persistan más allá de la sesión.
+- **Consulta pública de boletos**: `GET /api/reservas/consultar` exige
+  folio + últimos 4 dígitos del teléfono de algún pasajero de esa
+  reserva — evita que alguien "adivine" un folio y vea datos ajenos.
 - **Variables de entorno**: viven en `backend/.env`, que nunca se sube a
   Git (ver `backend/.gitignore`). `backend/.env.example` es la plantilla
   sin datos reales. Incluye credenciales de MySQL, `ADMIN_PASSWORD_HASH`

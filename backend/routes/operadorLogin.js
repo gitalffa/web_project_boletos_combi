@@ -26,7 +26,7 @@ routerOperadorLogin.post("/", async (peticion, respuesta) => {
 
   try {
     const [[operador]] = await pool.query(
-      "SELECT id, nombre, contrasena_hash FROM operadores WHERE usuario = ? AND activo = TRUE",
+      "SELECT id, nombre, contrasena_hash, debe_cambiar_contrasena FROM operadores WHERE usuario = ? AND activo = TRUE",
       [usuario]
     );
 
@@ -56,7 +56,12 @@ routerOperadorLogin.post("/", async (peticion, respuesta) => {
       { expiresIn: "12h" }
     );
 
-    respuesta.json({ estado: "ok", token, nombre: operador.nombre });
+    respuesta.json({
+      estado: "ok",
+      token,
+      nombre: operador.nombre,
+      debeCambiarContrasena: Boolean(operador.debe_cambiar_contrasena),
+    });
   } catch (error) {
     console.error("Error en login de operador:", error);
     respuesta.status(500).json({ estado: "error", mensaje: "No se pudo iniciar sesión" });

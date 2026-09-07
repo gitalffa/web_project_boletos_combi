@@ -43,8 +43,84 @@
         </form>
       </section>
 
+      <!-- PANTALLA: Cambio de contraseña (obligatorio la primera vez) -->
+      <section id="pantalla-cambiar-contrasena" class="pantalla">
+        <h2>Cambia tu contraseña</h2>
+        <p class="texto-ayuda" id="texto-cambio-obligatorio"></p>
+        <form id="formulario-cambiar-contrasena" novalidate>
+          <div class="campo">
+            <label for="contrasena-actual">Contraseña actual</label>
+            <input
+              type="password"
+              id="contrasena-actual"
+              autocomplete="current-password"
+            />
+          </div>
+          <div class="campo">
+            <label for="contrasena-nueva">Contraseña nueva</label>
+            <input
+              type="password"
+              id="contrasena-nueva"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="campo">
+            <label for="contrasena-nueva-confirmar"
+              >Confirma tu contraseña nueva</label
+            >
+            <input
+              type="password"
+              id="contrasena-nueva-confirmar"
+              autocomplete="new-password"
+            />
+          </div>
+          <p id="mensaje-cambiar-contrasena" class="campo-error"></p>
+          <button type="submit" class="boton-primario">
+            Guardar contraseña nueva
+          </button>
+          <button
+            type="button"
+            id="boton-cancelar-cambio-contrasena"
+            class="boton-secundario"
+            hidden
+          >
+            Cancelar
+          </button>
+        </form>
+      </section>
+
+      <!-- PANTALLA: Lista de pasajeros de hoy -->
       <!-- PANTALLA: Lista de pasajeros de hoy -->
       <section id="pantalla-lista-operador" class="pantalla">
+        <button
+          type="button"
+          id="boton-menu-hamburguesa-operador"
+          class="boton-hamburguesa"
+          aria-label="Abrir menú"
+          aria-expanded="false"
+          aria-controls="menu-panel-operador"
+        >
+          <span></span><span></span><span></span>
+        </button>
+
+        <nav id="menu-panel-operador" class="menu-panel">
+          <button
+            type="button"
+            id="boton-ir-a-cambiar-contrasena"
+            class="tab-admin"
+          >
+            Cambiar mi contraseña
+          </button>
+          <hr class="menu-panel__separador" />
+          <button
+            type="button"
+            id="boton-cerrar-sesion-operador"
+            class="menu-panel__cerrar-sesion"
+          >
+            Cerrar sesión
+          </button>
+        </nav>
+
         <p class="texto-ayuda">
           Hola, <strong id="nombre-operador"></strong> — hoy (<span
             id="fecha-operador"
@@ -53,14 +129,6 @@
         </p>
 
         <div id="contenedor-salidas"></div>
-
-        <button
-          type="button"
-          id="boton-cerrar-sesion-operador"
-          class="boton-secundario"
-        >
-          Cerrar sesión
-        </button>
       </section>
     </main>
 

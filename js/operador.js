@@ -13,16 +13,25 @@ import {
   cerrarSesion,
   obtenerMisReservas,
   marcarComoPagado,
+  debeCambiarContrasena,
+  marcarContrasenaComoActualizada,
+  cambiarContrasena,
 } from "./operadorService.js?v=1";
 
 function iniciar() {
   if (hayTokenGuardado()) {
-    mostrarPantalla("lista");
-    cargarMisReservas();
+    if (debeCambiarContrasena()) {
+      mostrarPantallaCambioObligatorio();
+    } else {
+      mostrarPantalla("lista");
+      cargarMisReservas();
+    }
   }
 
   configurarLogin();
   configurarCerrarSesion();
+  configurarCambioContrasena();
+  configurarMenuHamburguesa();
 }
 
 function configurarLogin() {
@@ -38,8 +47,12 @@ function configurarLogin() {
 
       try {
         await iniciarSesion(usuario, contrasena);
-        mostrarPantalla("lista");
-        cargarMisReservas();
+        if (debeCambiarContrasena()) {
+          mostrarPantallaCambioObligatorio();
+        } else {
+          mostrarPantalla("lista");
+          cargarMisReservas();
+        }
       } catch (error) {
         mensaje.textContent = "Usuario o contraseña incorrectos";
         mensaje.style.display = "block";
@@ -61,8 +74,81 @@ function mostrarPantalla(nombre) {
     .getElementById("pantalla-login-operador")
     .classList.toggle("activa", nombre === "login");
   document
+    .getElementById("pantalla-cambiar-contrasena")
+    .classList.toggle("activa", nombre === "cambiar-contrasena");
+  document
     .getElementById("pantalla-lista-operador")
     .classList.toggle("activa", nombre === "lista");
+}
+
+/**
+ * Muestra la pantalla de cambio de contraseña en su modo OBLIGATORIO
+ * (sin botón de cancelar): el operador entró con una contraseña
+ * temporal y no puede ver nada más hasta que la cambie.
+ */
+function mostrarPantallaCambioObligatorio() {
+  document.getElementById("texto-cambio-obligatorio").textContent =
+    "Tu contraseña es temporal. Debes crear una nueva antes de continuar.";
+  document.getElementById("boton-cancelar-cambio-contrasena").hidden = true;
+  mostrarPantalla("cambiar-contrasena");
+}
+
+/**
+ * Muestra la misma pantalla, pero en modo VOLUNTARIO (con botón de
+ * cancelar), para cuando el operador decide cambiar su contraseña
+ * por su cuenta, sin que el sistema lo esté obligando.
+ */
+function mostrarPantallaCambioVoluntario() {
+  document.getElementById("texto-cambio-obligatorio").textContent = "";
+  document.getElementById("boton-cancelar-cambio-contrasena").hidden = false;
+  mostrarPantalla("cambiar-contrasena");
+}
+
+function configurarCambioContrasena() {
+  document
+    .getElementById("boton-ir-a-cambiar-contrasena")
+    .addEventListener("click", () => {
+      cerrarMenuHamburguesa();
+      mostrarPantallaCambioVoluntario();
+    });
+
+  document
+    .getElementById("boton-cancelar-cambio-contrasena")
+    .addEventListener("click", () => {
+      document.getElementById("formulario-cambiar-contrasena").reset();
+      document.getElementById("mensaje-cambiar-contrasena").textContent = "";
+      mostrarPantalla("lista");
+    });
+
+  document
+    .getElementById("formulario-cambiar-contrasena")
+    .addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const mensaje = document.getElementById("mensaje-cambiar-contrasena");
+      mensaje.textContent = "";
+
+      const actual = document.getElementById("contrasena-actual").value;
+      const nueva = document.getElementById("contrasena-nueva").value;
+      const confirmacion = document.getElementById(
+        "contrasena-nueva-confirmar",
+      ).value;
+
+      if (nueva !== confirmacion) {
+        mensaje.textContent =
+          "La contraseña nueva y su confirmación no coinciden.";
+        return;
+      }
+
+      try {
+        await cambiarContrasena(actual, nueva);
+        marcarContrasenaComoActualizada();
+        document.getElementById("formulario-cambiar-contrasena").reset();
+        mostrarPantalla("lista");
+        cargarMisReservas();
+      } catch (error) {
+        mensaje.textContent = error.message;
+      }
+    });
 }
 
 async function cargarMisReservas() {
@@ -155,6 +241,23 @@ function dibujarPorSalida(reservas) {
     bloque.appendChild(tabla);
     contenedor.appendChild(bloque);
   }
+}
+
+function configurarMenuHamburguesa() {
+  const boton = document.getElementById("boton-menu-hamburguesa-operador");
+  const menu = document.getElementById("menu-panel-operador");
+
+  boton.addEventListener("click", () => {
+    const abierto = menu.classList.toggle("abierto");
+    boton.setAttribute("aria-expanded", String(abierto));
+  });
+}
+
+function cerrarMenuHamburguesa() {
+  document.getElementById("menu-panel-operador").classList.remove("abierto");
+  document
+    .getElementById("boton-menu-hamburguesa-operador")
+    .setAttribute("aria-expanded", "false");
 }
 
 iniciar();

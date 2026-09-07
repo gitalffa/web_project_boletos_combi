@@ -27,6 +27,7 @@ import { routerAdminOperadores } from "./routes/adminOperadores.js";
 import { routerOperadorLogin } from "./routes/operadorLogin.js";
 import { verificarOperador } from "./middleware/verificarOperador.js";
 import { routerOperadorReservas } from "./routes/operadorReservas.js";
+import { routerOperadorCuenta } from "./routes/operadorCuenta.js";
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use("/api/admin/estadisticas", verificarAdmin, routerAdminEstadisticas);
 app.use("/api/admin/operadores", verificarAdmin, routerAdminOperadores);
 app.use("/api/operador/login", routerOperadorLogin);
 app.use("/api/operador/reservas", verificarOperador, routerOperadorReservas);
+app.use("/api/operador", verificarOperador, routerOperadorCuenta);
 
 /**
  * Ruta de prueba simple: solo confirma que el servidor está vivo.

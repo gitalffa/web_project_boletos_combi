@@ -41,7 +41,18 @@
 
       <!-- PANTALLA: Panel principal (una vez autenticado) -->
       <section id="pantalla-panel" class="pantalla">
-        <nav class="tabs-admin">
+        <button
+          type="button"
+          id="boton-menu-hamburguesa"
+          class="boton-hamburguesa"
+          aria-label="Abrir menú"
+          aria-expanded="false"
+          aria-controls="menu-panel-admin"
+        >
+          <span></span><span></span><span></span>
+        </button>
+
+        <nav id="menu-panel-admin" class="menu-panel">
           <button
             type="button"
             class="tab-admin activa"
@@ -63,6 +74,14 @@
           </button>
           <button type="button" class="tab-admin" data-tab="operadores">
             Operadores
+          </button>
+          <hr class="menu-panel__separador" />
+          <button
+            type="button"
+            id="boton-cerrar-sesion-admin"
+            class="menu-panel__cerrar-sesion"
+          >
+            Cerrar sesión
           </button>
         </nav>
 

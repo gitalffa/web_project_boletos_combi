@@ -14,6 +14,7 @@ import {
   obtenerHorarios,
   obtenerEstadoAsientos,
   crearReserva,
+  consultarReserva,
 } from "./dataService.js?v=1";
 import {
   renderizarMapaAsientos,
@@ -57,6 +58,8 @@ async function iniciar() {
   configurarBotonContinuarAsientos();
   configurarFormularioPasajeros();
   configurarModalidad();
+  configurarDescargaComprobante();
+  configurarConsulta();
 }
 
 /**
@@ -367,10 +370,20 @@ function mostrarMensajeModalidad(texto) {
   if (contenedor) contenedor.textContent = texto;
 }
 
-function dibujarComprobante(folio, venceEn, modalidad) {
-  const contenedor = document.getElementById("comprobante");
-
-  const listaPasajeros = viajeEnCurso.pasajeros
+/**
+ * Construye el HTML del comprobante a partir de datos ya en el
+ * formato genérico que usan tanto una compra recién hecha como una
+ * consulta posterior por folio.
+ */
+function construirHtmlComprobante({
+  folio,
+  horario,
+  fecha,
+  modalidad,
+  vencePara,
+  pasajeros,
+}) {
+  const listaPasajeros = pasajeros
     .map(
       (p) => `<li>Asiento ${p.numeroAsiento}: ${p.nombre} — ${p.contacto}</li>`,
     )
@@ -382,18 +395,30 @@ function dibujarComprobante(folio, venceEn, modalidad) {
       : "Pagado en línea";
 
   const avisoVencimiento =
-    modalidad === "apartado"
-      ? `<p><strong>Debes abordar o pagar antes de:</strong> ${formatearFechaHoraLegible(venceEn)}</p>`
+    modalidad === "apartado" && vencePara
+      ? `<p><strong>Debes abordar o pagar antes de:</strong> ${formatearFechaHoraLegible(vencePara)}</p>`
       : "";
 
-  contenedor.innerHTML = `
-    <h2>¡Listo! Este es tu comprobante</h2>
+  return `
+    <h2>Comprobante de tu boleto</h2>
     <p><strong>Folio:</strong> ${folio}</p>
-    <p><strong>Salida:</strong> ${viajeEnCurso.horaTexto} hrs, ${viajeEnCurso.fecha}</p>
+    <p><strong>Salida:</strong> ${horario} hrs, ${fecha}</p>
     <p><strong>Modalidad:</strong> ${textoModalidad}</p>
     <ul>${listaPasajeros}</ul>
     ${avisoVencimiento}
   `;
+}
+
+function dibujarComprobante(folio, venceEn, modalidad) {
+  const contenedor = document.getElementById("comprobante");
+  contenedor.innerHTML = construirHtmlComprobante({
+    folio,
+    horario: viajeEnCurso.horaTexto,
+    fecha: viajeEnCurso.fecha,
+    modalidad,
+    vencePara: venceEn,
+    pasajeros: viajeEnCurso.pasajeros,
+  });
 }
 
 function formatearFechaHoraLegible(fechaISO) {
@@ -416,6 +441,63 @@ async function reiniciarCompra() {
 
   mostrarPantalla("inicio");
   await dibujarHorarios(); // por si mientras comprabas ya pasó otro horario
+}
+
+/**
+ * Conecta el botón de descarga/impresión: usa la función nativa del
+ * navegador, con la hoja de estilo de impresión que solo muestra el
+ * comprobante (ver @media print en styles.css).
+ */
+function configurarDescargaComprobante() {
+  document
+    .getElementById("boton-descargar-comprobante")
+    .addEventListener("click", () => {
+      window.print();
+    });
+}
+
+/**
+ * Pantalla de "Consultar mi boleto": busca por folio + últimos 4
+ * dígitos del teléfono, y si lo encuentra, dibuja el mismo formato
+ * de comprobante (con su propio botón de imprimir).
+ */
+function configurarConsulta() {
+  document
+    .getElementById("boton-ir-a-consultar")
+    .addEventListener("click", () => {
+      mostrarPantalla("consulta");
+    });
+
+  document
+    .getElementById("formulario-consulta")
+    .addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const mensaje = document.getElementById("mensaje-consulta");
+      const resultado = document.getElementById("resultado-consulta");
+      mensaje.textContent = "";
+      resultado.innerHTML = "";
+
+      const folio = document.getElementById("folio-consulta").value.trim();
+      const telefono = document
+        .getElementById("telefono-consulta")
+        .value.trim();
+
+      try {
+        const datos = await consultarReserva(folio, telefono);
+        resultado.innerHTML =
+          construirHtmlComprobante(datos) +
+          `<button type="button" id="boton-descargar-consulta" class="boton-secundario">Descargar / Imprimir</button>`;
+
+        document
+          .getElementById("boton-descargar-consulta")
+          .addEventListener("click", () => {
+            window.print();
+          });
+      } catch (error) {
+        mensaje.textContent =
+          "No encontramos ese boleto. Revisa el folio y el teléfono.";
+      }
+    });
 }
 
 function configurarBotonesVolver() {

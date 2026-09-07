@@ -407,3 +407,39 @@ input:focus-visible {
   margin-bottom: var(--espacio-m);
   border: 2px dashed var(--color-acento);
 }
+
+/* =============================================================
+   IMPRESIÓN / DESCARGA DEL COMPROBANTE
+   Al imprimir (o "Guardar como PDF" desde el diálogo de impresión
+   del celular), solo se ve el comprobante — nada más de la app.
+   ============================================================= */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #comprobante,
+  #comprobante *,
+  #resultado-consulta,
+  #resultado-consulta * {
+    visibility: visible;
+  }
+  #comprobante,
+  #resultado-consulta {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: none;
+  }
+}
+
+.enlace-texto {
+  background: none;
+  border: none;
+  color: var(--color-primario);
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 0;
+  margin-top: var(--espacio-m);
+  display: block;
+}
